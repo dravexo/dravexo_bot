@@ -7,7 +7,7 @@ const db = admin.database();
 
 // Configure CORS to ONLY allow requests from your local development server.
 // For production, you might want to restrict this further or allow your deployed web app's URL.
-const corsHandler = cors({ origin: "http://127.0.0.1:5500" });
+const corsHandler = cors({ origin: "https://dravexo.github.io/dravexo_bot/" });
 
 // --- RATE LIMITING & BOT DETECTION CONFIG ---
 const RATE_LIMITS = {
