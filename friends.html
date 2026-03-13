@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invite Friends</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Adsgram Script -->
+    <script src="https://adsgram.ai/js/adsgram.js"></script>
+    <style>
+        /* Basic styles from other pages */
+        html, body { height: 100%; margin: 0; font-family: 'Poppins', sans-serif; color: white; }
+        .background-container {
+            background-image: url('background.png');
+            height: 100%; width: 100%; background-size: cover;
+            background-position: center; text-align: center; padding-top: 50px;
+            box-sizing: border-box; display: flex; flex-direction: column;
+            align-items: center; overflow-y: auto;
+        }
+        h1 { font-size: 3em; font-weight: 700; color: #FFD700; text-shadow: 3px 3px 6px rgba(0,0,0,0.7); margin-bottom: 20px; }
+        .back-button {
+            margin-top: 20px; padding: 12px 30px; border-radius: 10px; background: #6c757d;
+            color: white; text-decoration: none; font-weight: bold; margin-bottom: 20px;
+        }
+
+        /* Custom styles for this page */
+        .card {
+            background-color: rgba(0, 0, 0, 0.6);
+            border: 2px solid #FFD700;
+            border-radius: 15px;
+            padding: 20px;
+            width: 90%;
+            max-width: 500px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .card h2 { margin-top: 0; color: #FFD700; }
+        .card p { color: #ddd; line-height: 1.5; }
+        
+        .referral-link-container {
+            display: flex;
+            background: rgba(0,0,0,0.4);
+            padding: 10px;
+            border-radius: 10px;
+            margin-top: 15px;
+            align-items: center;
+        }
+        .referral-link {
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.9em;
+            color: #ccc;
+            text-align: left;
+        }
+        .copy-btn {
+            background: #0088cc;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .friend-list { list-style: none; padding: 0; }
+        .friend-item {
+            display: flex;
+            align-items: center;
+            background: rgba(255,255,255,0.05);
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+        .friend-item img { width: 40px; height: 40px; border-radius: 50%; margin-right: 15px; }
+        .friend-info { text-align: left; }
+        .friend-info .name { font-weight: 600; }
+        .friend-info .bonus { font-size: 0.8em; color: #28a745; }
+        .friend-info .friend-bonus { font-size: 0.8em; color: #FFD700; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            text-align: center;
+        }
+        .stat-item h3 {
+            margin: 0 0 5px 0;
+            font-size: 1.8em;
+            color: #FFD700;
+        }
+        .stat-item p {
+            margin: 0;
+            font-size: 0.9em;
+            color: #ccc;
+        }
+
+        .milestone {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .milestone:last-child { border-bottom: none; }
+        .milestone-info p { margin: 0; font-weight: 600; }
+        .milestone-info span { font-size: 0.8em; color: #FFD700; }
+
+        .claim-milestone-btn {
+            border: none;
+            margin: 0; padding: 8px 15px;
+            background: linear-gradient(45deg, #28a745, #218838);
+        }
+        .claim-milestone-btn:disabled {
+            background: #555;
+            color: #aaa;
+            cursor: not-allowed;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="background-container">
+        <h1>Refer Friends & Earn</h1>
+
+        <div class="card">
+            <h2>Your Referral Link</h2>
+            <p>Your friend gets <b>5,000 Dravexo</b> for joining, and you get huge milestone bonuses + <b>2% lifetime commission</b> on their earnings!</p>
+            <div class="referral-link-container">
+                <span class="referral-link" id="ref-link"></span>
+                <button class="copy-btn" id="copy-btn">Copy</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Your Referral Stats</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <h3 id="friends-invited-stat">0</h3>
+                    <p>Friends Invited</p>
+                </div>
+                <div class="stat-item">
+                    <h3 id="bonus-earned-stat">0</h3>
+                    <p>Total Bonus Earned</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Permanent Boosts</h2>
+            <p>For every friend you invite, your energy recharges <strong>5% faster</strong>, permanently!</p>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <h3 id="friends-boost-stat">+0%</h3>
+                    <p>Current Regen Boost</p>
+                </div>
+                <div class="stat-item">
+                    <h3 id="new-regen-rate">1.0/sec</h3>
+                    <p>New Energy Rate</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Milestone Rewards</h2>
+            <div id="milestones-list">
+                <!-- Milestones loaded by JS -->
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Your Friends (<span id="friend-count">0</span>)</h2>
+            <ul class="friend-list" id="friend-list">
+                <!-- Friends will be loaded here -->
+            </ul>
+        </div>
+
+        <a href="index.html" class="back-button">Back to Game</a>
+    </div>
+
+    <script>
+        const refLinkEl = document.getElementById('ref-link');
+        const copyBtn = document.getElementById('copy-btn');
+        const friendListEl = document.getElementById('friend-list');
+        const friendCountEl = document.getElementById('friend-count');
+        const friendsInvitedStat = document.getElementById('friends-invited-stat');
+        const bonusEarnedStat = document.getElementById('bonus-earned-stat');
+        const milestonesListEl = document.getElementById('milestones-list');
+        const friendsBoostStat = document.getElementById('friends-boost-stat');
+        const newRegenRate = document.getElementById('new-regen-rate');
+
+        // --- FIREBASE SETUP ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyARA7kKshwUYXrN5iiLkmA-WsF0Re14YVA",
+            authDomain: "dravexobot.firebaseapp.com",
+            databaseURL: "https://dravexobot-default-rtdb.firebaseio.com",
+            projectId: "dravexobot",
+            storageBucket: "dravexobot.firebasestorage.app",
+            messagingSenderId: "771384217218",
+            appId: "1:771384217218:web:117efa3a4b3216b70aae9b",
+            measurementId: "G-14CZ1JE8PK"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        let currentUser = null;
+        auth.onAuthStateChanged(user => {
+            if(user) {
+                currentUser = user;
+                const referralLink = `https://t.me/dravexo_bot?start=${user.uid}`;
+                refLinkEl.textContent = referralLink;
+                loadServerData();
+            } else {
+                auth.signInAnonymously();
+            }
+        });
+
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(referralLink).then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+            }).catch(err => {
+                alert('Failed to copy link.');
+            });
+        });
+
+        // --- Simulate and load friends ---
+        // In a real app, you'd get this from your server
+        let invitedCount = 0;
+        let claimedMilestones = [];
+
+        const milestones = [
+            { id: 'm1', required: 1, reward: 10000 },
+            { id: 'm2', required: 3, reward: 35000 },
+            { id: 'm3', required: 5, reward: 75000 },
+            { id: 'm4', required: 10, reward: 200000 },
+            { id: 'm5', required: 25, reward: 1000000 }
+        ];
+
+        function loadFriends() {
+            const friendCount = fakeFriends.length;
+            friendCountEl.textContent = friendCount;
+            friendsInvitedStat.textContent = friendCount;
+            localStorage.setItem('referredFriendsCount', friendCount); // Save for main game
+
+            // Calculate and display boost
+            const boostPercentage = friendCount * 5; // 5% per friend
+            const baseRegenRate = 1.0;
+            const boostedRegenRate = baseRegenRate * (1 + (boostPercentage / 100));
+            
+            friendsBoostStat.textContent = `+${boostPercentage}%`;
+            newRegenRate.textContent = `${boostedRegenRate.toFixed(2)}/sec`;
+
+            if (fakeFriends.length === 0) {
+                friendListEl.innerHTML = '<p style="color: #888;">You haven\'t invited any friends yet.</p>';
+                return;
+            }
+
+            friendListEl.innerHTML = '';
+            fakeFriends.slice().reverse().forEach(friend => {
+                const item = document.createElement('li');
+                item.className = 'friend-item';
+                item.innerHTML = `
+                    <img src="https://i.pravatar.cc/40?u=${friend.name}" alt="Avatar">
+                    <div class="friend-info">
+                        <div class="name">${friend.name}</div>
+                        <div class="friend-bonus">Got 5,000 Dravexo!</div>
+                    </div>
+                `;
+                friendListEl.appendChild(item);
+            });
+        }
+
+        function updateTotalBonusStat() {
+            let totalBonus = 0;
+            claimedMilestones.forEach(claimedId => {
+                const milestone = milestones.find(m => m.id === claimedId);
+                if (milestone) {
+                    totalBonus += milestone.reward;
+                }
+            });
+            bonusEarnedStat.textContent = totalBonus.toLocaleString();
+        }
+
+        function loadMilestones() {
+            const friendCount = fakeFriends.length;
+            milestonesListEl.innerHTML = '';
+            milestones.forEach(ms => {
+                const isClaimed = claimedMilestones.includes(ms.id);
+                const canClaim = friendCount >= ms.required && !isClaimed;
+                
+                const milestoneEl = document.createElement('div');
+                milestoneEl.className = 'milestone';
+                milestoneEl.innerHTML = `
+                    <div class="milestone-info">
+                        <p>Invite ${ms.required} Friends</p>
+                        <span>Reward: <b>${ms.reward.toLocaleString()}</b> Dravexo</span>
+                    </div>
+                    <button class="copy-btn claim-milestone-btn" 
+                            data-id="${ms.id}" 
+                            data-reward="${ms.reward}" 
+                            ${canClaim ? '' : 'disabled'}>
+                        ${isClaimed ? '✅ Claimed' : (canClaim ? 'Claim' : 'Locked')}
+                    </button>
+                `;
+                milestonesListEl.appendChild(milestoneEl);
+            });
+
+            document.querySelectorAll('.claim-milestone-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    if (e.target.disabled) return;
+
+                    const id = e.target.getAttribute('data-id');
+                    const reward = parseInt(e.target.getAttribute('data-reward'));
+
+                    let currentScore = parseInt(localStorage.getItem('coinScore')) || 0;
+                    currentScore += reward;
+                    localStorage.setItem('coinScore', currentScore);
+                    
+                    claimedMilestones.push(id);
+                    localStorage.setItem('claimedMilestones', JSON.stringify(claimedMilestones));
+
+                    const transactions = JSON.parse(localStorage.getItem('transactionHistory')) || [];
+                    transactions.push({ type: 'Milestone Bonus', amount: reward, date: new Date().getTime() });
+                    localStorage.setItem('transactionHistory', JSON.stringify(transactions));
+                    
+                    alert(`Milestone complete! You claimed ${reward.toLocaleString()} Dravexo!`);
+                    updateTotalBonusStat();
+                    loadMilestones(); // Refresh buttons
+                });
+            });
+        }
+
+        window.addEventListener('load', () => {
+            loadFriends();
+            loadMilestones();
+            updateTotalBonusStat();
+        });
+    </script>
+</body>
+</html>

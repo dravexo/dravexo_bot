@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Wallet</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <style>
+        html, body { height: 100%; margin: 0; font-family: 'Poppins', sans-serif; color: white; }
+        .background-container {
+            background-image: url('background.png');
+            height: 100%; width: 100%; background-size: cover;
+            background-position: center; background-repeat: no-repeat;
+            text-align: center; padding-top: 40px; box-sizing: border-box;
+            display: flex; flex-direction: column; align-items: center; overflow-y: auto; position: relative;
+        }
+        h1 { font-size: 2.5em; font-weight: 700; color: #FFD700; text-shadow: 3px 3px 6px rgba(0,0,0,0.7); margin-bottom: 10px; }
+        
+        .wallet-card {
+            background: rgba(20, 20, 20, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            width: 90%;
+            max-width: 400px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+        }
+
+        .balance-section p {
+            margin: 0;
+            font-size: 1em;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .balance-section h2 {
+            margin: 5px 0 5px 0;
+            font-size: 3em;
+            font-weight: 800;
+            color: #FFD700;
+            word-wrap: break-word;
+        }
+
+        .usd-balance {
+            font-size: 1em;
+            color: #ccc;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .network-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(0, 136, 204, 0.15);
+            color: #0088cc;
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .status-badge {
+            background: rgba(255, 165, 0, 0.2);
+            color: #FFA500;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+
+        .actions {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 30px;
+        }
+
+        .action-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: none;
+            border: none;
+            color: white;
+            font-family: 'Poppins', sans-serif;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .action-btn .icon {
+            font-size: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+        
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+
+        .transactions { text-align: left; }
+        .transactions h3 {
+            font-size: 1.2em;
+            color: #ddd;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.9em;
+            align-items: center;
+        }
+        .transaction-item:last-child { border-bottom: none; }
+        
+        .transaction-left { display: flex; flex-direction: column; text-align: left; }
+        .transaction-item .type { font-weight: 600; color: white; }
+        .transaction-item .date { font-size: 0.75em; color: #888; margin-top: 2px; }
+        
+        .transaction-item .amount { color: #28a745; font-weight: bold; }
+        .transaction-item .amount.sent { color: #dc3545; }
+
+        .back-button {
+            margin-top: 20px;
+            padding: 12px 30px; border-radius: 10px; background: #6c757d;
+            color: white; text-decoration: none; font-weight: bold;
+        }
+
+        /* Connect Wallet Button */
+        .header-actions {
+            width: 90%;
+            max-width: 400px;
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+        }
+
+        .connect-btn {
+            background-color: #0088cc; /* TON Blue */
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 0.9em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(0, 136, 204, 0.4);
+            transition: all 0.2s;
+        }
+        
+        .connect-btn:hover { transform: translateY(-2px); }
+        
+        .connect-btn.connected {
+            background-color: rgba(40, 40, 40, 0.9);
+            border: 1px solid #444;
+            color: #ddd;
+        }
+
+        /* --- Connect Wallet Modal Styles --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .modal-content {
+            background: linear-gradient(135deg, #2c3e50, #1a252f);
+            margin: 30% auto;
+            padding: 30px;
+            border: 2px solid #FFD700;
+            border-radius: 25px;
+            width: 85%;
+            max-width: 350px;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+            animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .close-button {
+            color: #aaa;
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .close-button:hover { color: white; }
+
+        .modal h2 { margin-top: 0; color: #fff; font-size: 1.8em; margin-bottom: 10px; }
+        .modal p { color: #ccc; margin-bottom: 25px; }
+
+        .wallet-option {
+            display: flex;
+            align-items: center;
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .wallet-option:hover {
+            background: rgba(255,255,255,0.15);
+            transform: scale(1.03);
+            border-color: #FFD700;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .wallet-option img { width: 40px; height: 40px; margin-right: 15px; }
+        .wallet-option span { font-size: 1.1em; font-weight: 600; color: white; }
+        
+        .loader {
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="background-container">
+        <div class="header-actions">
+            <button id="connect-wallet-btn" class="connect-btn">Connect Wallet</button>
+        </div>
+        <h1>My Wallet</h1>
+        <div class="wallet-card">
+            <div class="balance-section">
+                <div class="status-badge">⛏️ Phase 1: Mining</div>
+                <p>Airdrop Balance</p>
+                <div class="network-info">
+                    <img src="https://img.icons8.com/color/48/ton-coin.png" width="14" height="14"> TON Network
+                </div>
+                <h2 id="wallet-balance">0</h2>
+                <p class="usd-balance" id="usd-balance">≈ $0.00 USD</p>
+            </div>
+            <div class="actions">
+                <button class="action-btn" id="withdraw-btn">
+                    <span class="icon">⬆️</span>
+                    <span>Withdraw</span>
+                </button>
+                <button class="action-btn" id="receive-btn">
+                    <span class="icon">⬇️</span>
+                    <span>Deposit</span>
+                </button>
+                <button class="action-btn" id="swap-btn">
+                    <span class="icon">🔄</span>
+                    <span>Swap</span>
+                </button>
+            </div>
+            <div class="transactions">
+                <h3>Recent Transactions</h3>
+                <div id="transaction-list">
+                    <p style="color: #888; text-align: center; margin-top: 20px;">Loading transactions...</p>
+                </div>
+            </div>
+        </div>
+        <a href="index.html" class="back-button">Back to Game</a>
+    </div>
+
+    <!-- Connect Wallet Modal -->
+    <div id="walletModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Connect Wallet</h2>
+            <p>Choose your preferred wallet</p>
+            
+            <div id="wallet-list">
+                <div class="wallet-option" data-wallet="Telegram Wallet">
+                    <img src="https://img.icons8.com/color/48/telegram-app.png" alt="Telegram">
+                    <span>Telegram Wallet</span>
+                </div>
+            </div>
+
+            <div id="wallet-loading" style="display: none;">
+                <div class="loader"></div>
+                <p>Connecting to <span id="connecting-wallet-name">...</span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Launch Info Modal -->
+    <div id="launchModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-launch-modal">&times;</span>
+            <img src="https://img.icons8.com/3d-fluency/94/rocket.png" alt="Rocket" style="width: 80px; margin-bottom: 10px;">
+            <h2>Token Launching Soon!</h2>
+            <p>Withdrawals and Swaps will unlock after the official <b>Dravexo (AVN)</b> listing on exchanges.</p>
+            <p style="color: #FFD700; font-size: 0.9em;">Keep mining to maximize your allocation!</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+             // --- FIREBASE CONFIG ---
+            const firebaseConfig = {
+                apiKey: "AIzaSyARA7kKshwUYXrN5iiLkmA-WsF0Re14YVA",
+                authDomain: "dravexobot.firebaseapp.com",
+                databaseURL: "https://dravexobot-default-rtdb.firebaseio.com",
+                projectId: "dravexobot",
+                storageBucket: "dravexobot.firebasestorage.app",
+                messagingSenderId: "771384217218",
+                appId: "1:771384217218:web:117efa3a4b3216b70aae9b",
+                measurementId: "G-14CZ1JE8PK"
+            };
+            firebase.initializeApp(firebaseConfig);
+            const db = firebase.database();
+            const auth = firebase.auth();
+
+            // Elements
+            const walletBalance = document.getElementById('wallet-balance');
+            const usdBalance = document.getElementById('usd-balance');
+            const connectBtn = document.getElementById('connect-wallet-btn');
+            
+            // Modal Elements
+            const walletModal = document.getElementById('walletModal');
+            const closeModal = document.querySelector('.close-button');
+            const walletList = document.getElementById('wallet-list');
+            const walletLoading = document.getElementById('wallet-loading');
+            const connectingWalletName = document.getElementById('connecting-wallet-name');
+            const walletOptions = document.querySelectorAll('.wallet-option');
+            const transactionList = document.getElementById('transaction-list');
+            
+            // Launch Modal Elements
+            const launchModal = document.getElementById('launchModal');
+            const closeLaunchModal = document.getElementById('close-launch-modal');
+            const actionButtons = document.querySelectorAll('.action-btn');
+            
+            // Constants
+            const BASE_TOKEN_PRICE = 0.00001; // 100,000 coins = $1
+            
+            function updateBalanceUI(balance) {
+                walletBalance.textContent = balance.toLocaleString();
+                const usdValue = (balance * BASE_TOKEN_PRICE).toFixed(2);
+                usdBalance.textContent = `≈ $${usdValue} USD`;
+            }
+
+            auth.onAuthStateChanged(user => {
+                if(user) {
+                    db.ref('users/' + user.uid + '/score').on('value', snap => {
+                        updateBalanceUI(snap.val() || 0);
+                    });
+                }
+            });
+
+            // Wallet Connection Logic
+            let isConnected = localStorage.getItem('walletConnected') === 'true';
+            
+            function updateConnectButton() {
+                if (isConnected) {
+                    connectBtn.textContent = 'UQC...8xL'; // Fake Address
+                    connectBtn.classList.add('connected');
+                } else {
+                    connectBtn.textContent = 'Connect Wallet';
+                    connectBtn.classList.remove('connected');
+                }
+            }
+
+            // Open Modal
+            connectBtn.addEventListener('click', () => {
+                if (isConnected) {
+                    // If already connected, disconnect logic
+                    if(confirm("Do you want to disconnect your wallet?")) {
+                isConnected = !isConnected;
+                localStorage.setItem('walletConnected', isConnected);
+                updateConnectButton();
+                    }
+                } else {
+                    // Show Modal
+                    walletList.style.display = 'block';
+                    walletLoading.style.display = 'none';
+                    walletModal.style.display = 'block';
+                }
+            });
+
+            // Close Modal
+            closeModal.addEventListener('click', () => {
+                walletModal.style.display = 'none';
+            });
+            
+            closeLaunchModal.addEventListener('click', () => {
+                launchModal.style.display = 'none';
+            });
+
+            window.addEventListener('click', (e) => {
+                if (e.target == walletModal) {
+                    walletModal.style.display = 'none';
+                }
+                if (e.target == launchModal) {
+                    launchModal.style.display = 'none';
+                }
+            });
+
+            // Handle Wallet Selection
+            walletOptions.forEach(option => {
+                option.addEventListener('click', () => {
+                    const walletName = option.getAttribute('data-wallet');
+                    
+                    // Show loading
+                    walletList.style.display = 'none';
+                    walletLoading.style.display = 'block';
+                    connectingWalletName.textContent = walletName;
+
+                    // Simulate connection delay
+                    setTimeout(() => {
+                        isConnected = true;
+                        localStorage.setItem('walletConnected', isConnected);
+                        updateConnectButton();
+                        walletModal.style.display = 'none';
+                        alert(`Successfully connected to ${walletName}!`);
+                    }, 2000);
+                });
+            });
+
+            updateConnectButton();
+
+            // Handle Action Buttons (Withdraw/Swap/Receive)
+            actionButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    launchModal.style.display = 'block';
+                });
+            });
+
+            // --- Load Real Transactions ---
+            function loadTransactions() {
+                const transactions = JSON.parse(localStorage.getItem('transactionHistory')) || [];
+                
+                if (transactions.length === 0) {
+                    transactionList.innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">No recent transactions</p>';
+                    return;
+                }
+
+                transactionList.innerHTML = '';
+                // Show last 10 transactions (newest first)
+                transactions.slice().reverse().slice(0, 10).forEach(tx => {
+                    const date = new Date(tx.date);
+                    const now = new Date();
+                    let dateStr;
+                    
+                    // Format Date nicely
+                    if (date.toDateString() === now.toDateString()) {
+                        dateStr = `Today, ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                    } else {
+                        dateStr = date.toLocaleDateString() + ', ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    }
+
+                    const item = document.createElement('div');
+                    item.className = 'transaction-item';
+                    item.innerHTML = `
+                        <div class="transaction-left">
+                            <span class="type">${tx.type}</span>
+                            <span class="date">${dateStr}</span>
+                        </div>
+                        <span class="amount">+${tx.amount.toLocaleString()}</span>
+                    `;
+                    transactionList.appendChild(item);
+                });
+            }
+
+            loadTransactions();
+        });
+    </script>
+</body>
+</html>

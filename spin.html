@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spin & Win</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Adsgram Script -->
+    <script src="https://adsgram.ai/js/adsgram.js"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
+    <style>
+        html, body { height: 100%; margin: 0; font-family: 'Poppins', sans-serif; color: white; }
+        .background-container {
+            background-image: url('background.png');
+            height: 100%; width: 100%; background-size: cover;
+            background-position: center; text-align: center; padding-top: 50px;
+            box-sizing: border-box; display: flex; flex-direction: column;
+            align-items: center; overflow: hidden;
+        }
+        h1 { font-size: 3em; font-weight: 700; color: #FFD700; text-shadow: 3px 3px 6px rgba(0,0,0,0.7); margin-bottom: 20px; }
+        
+        .wheel-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin-bottom: 30px;
+        }
+
+        .wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 5px solid #FFD700;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            background: conic-gradient(
+                #FF3B30 0deg 60deg,    /* 500 - Red */
+                #AF52DE 60deg 120deg,  /* 1K - Purple */
+                #007AFF 120deg 180deg, /* 2K - Blue */
+                #34C759 180deg 240deg, /* 100 - Green */
+                #FF9500 240deg 300deg, /* 5K - Orange */
+                #1a1a1a 300deg 360deg  /* JACKPOT - Black (Premium) */
+            );
+            transition: transform 3s cubic-bezier(0.25, 0.1, 0.25, 1);
+            position: relative;
+        }
+
+        .segment {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            transform: rotate(calc(60deg * var(--i)));
+            font-size: 1.1em;
+        }
+        .segment span {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(30deg) translate(0, -100px);
+            font-weight: 800;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            font-size: 1.4em;
+        }
+
+        .segment.jackpot span {
+            color: #FFD700;
+            font-size: 1.1em;
+        }
+
+        /* Marker */
+        .marker {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; 
+            height: 0; 
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid white;
+            z-index: 10;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
+        }
+
+        .spin-btn {
+            padding: 15px 40px;
+            font-size: 1.5em;
+            font-weight: bold;
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            color: #000;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+        }
+        
+        .spin-btn:active { transform: scale(0.95); }
+        .spin-btn:disabled { background: #555; color: #888; cursor: not-allowed; }
+
+        .back-button {
+            margin-top: 30px; padding: 12px 30px; border-radius: 10px; background: #6c757d;
+            color: white; text-decoration: none; font-weight: bold;
+        }
+
+        .cost-text { margin-top: 10px; color: #ddd; font-size: 0.9em; }
+
+        /* Inner text for decoration */
+        .wheel::after {
+            content: "SPIN";
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            width: 50px; height: 50px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: #333; font-weight: bold; font-size: 0.8em;
+            border: 3px solid #FFD700;
+        }
+
+        /* --- Reward Modal Styles --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a252f, #2c3e50);
+            margin: 40% auto;
+            padding: 30px;
+            border: 3px solid #FFD700;
+            border-radius: 20px;
+            width: 80%;
+            max-width: 350px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+            animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+            position: relative;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-content h2 {
+            color: #FFD700;
+            font-size: 2em;
+            margin-top: 10px;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .modal-content p {
+            font-size: 1.2em;
+            color: #fff;
+            margin: 15px 0;
+        }
+
+        .modal-btn {
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            color: #000;
+            font-weight: 800;
+            font-size: 1.1em;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 165, 0, 0.4);
+            transition: transform 0.2s;
+        }
+
+        .actions-container {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #spins-left-text, #cooldown-text {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #eee;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        .ad-button {
+            padding: 12px 25px;
+            font-size: 1.1em;
+            font-weight: bold;
+            background: linear-gradient(45deg, #0088cc, #005f8e);
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            color: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="background-container">
+        <h1>Spin & Win</h1>
+        
+        <div class="wheel-container">
+            <div class="marker"></div>
+            <div class="wheel" id="wheel">
+                <div class="segment" style="--i:0;"><span>500</span></div>
+                <div class="segment" style="--i:1;"><span>1K</span></div>
+                <div class="segment" style="--i:2;"><span>2K</span></div>
+                <div class="segment" style="--i:3;"><span>100</span></div>
+                <div class="segment" style="--i:4;"><span>5K</span></div>
+                <div class="segment jackpot" style="--i:5;"><span>JACKPOT</span></div>
+            </div>
+        </div>
+
+        <button class="spin-btn" id="spin-btn">SPIN</button>
+        <p class="cost-text">Cost: 100 Energy</p>
+        
+        <div class="actions-container">
+            <p id="spins-left-text">Spins Left: 3</p>
+            <p id="cooldown-text" style="display: none;">Next free spins in 12:00:00</p>
+            <button id="watch-ad-btn" class="ad-button" style="display: none;">Watch Ad for 2 Spins</button>
+        </div>
+        
+        <a href="index.html" class="back-button">Back to Game</a>
+    </div>
+
+    <!-- Reward Popup -->
+    <div id="rewardModal" class="modal">
+        <div class="modal-content">
+            <img src="https://img.icons8.com/3d-fluency/94/confetti.png" alt="Party" style="width: 80px;">
+            <h2>You Won!</h2>
+            <p id="modal-message">You won a prize!</p>
+            <button class="modal-btn" id="collect-btn">Collect</button>
+        </div>
+    </div>
+
+    <!-- Info Popup -->
+    <div id="infoModal" class="modal">
+        <div class="modal-content" style="border-color: #007AFF;">
+            <img src="https://img.icons8.com/fluency/96/info.png" alt="Info" style="width: 80px;">
+            <h2 id="info-modal-title" style="color: #007AFF;">Info</h2>
+            <p id="info-modal-message">Something happened.</p>
+            <button class="modal-btn" id="info-ok-btn" style="background: linear-gradient(45deg, #007AFF, #005f8e);">OK</button>
+        </div>
+    </div>
+
+    <script>
+        const wheel = document.getElementById('wheel');
+        const spinBtn = document.getElementById('spin-btn');
+        
+        // UI Elements
+        const rewardModal = document.getElementById('rewardModal');
+        const modalMessage = document.getElementById('modal-message');
+        const collectBtn = document.getElementById('collect-btn');
+        const infoModal = document.getElementById('infoModal');
+        const infoModalTitle = document.getElementById('info-modal-title');
+        const infoModalMessage = document.getElementById('info-modal-message');
+        const infoOkBtn = document.getElementById('info-ok-btn');
+
+        // --- FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyARA7kKshwUYXrN5iiLkmA-WsF0Re14YVA",
+            authDomain: "dravexobot.firebaseapp.com",
+            databaseURL: "https://dravexobot-default-rtdb.firebaseio.com",
+            projectId: "dravexobot",
+            storageBucket: "dravexobot.firebasestorage.app",
+            messagingSenderId: "771384217218",
+            appId: "1:771384217218:web:117efa3a4b3216b70aae9b",
+            measurementId: "G-14CZ1JE8PK"
+        };
+
+        // --- Firebase Initialize ---
+        let auth;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    // User is signed in. Enable the spin button.
+                    spinBtn.disabled = false;
+                } else {
+                    // User is not signed in. Try to sign in anonymously.
+                    auth.signInAnonymously().catch(error => {
+                        console.error("Anonymous sign-in failed:", error);
+                        showInfoPopup("Auth Error", "Could not authenticate with the server.");
+                    });
+                }
+            });
+        } catch (e) {
+            console.error("Firebase initialization failed:", e);
+            showInfoPopup("Connection Error", "Could not connect to game services.");
+        }
+
+        let isSpinning = false;
+
+        // --- Modal Functions ---
+        function closeModal() {
+            rewardModal.style.display = 'none';
+        }
+
+        function hideInfoPopup() {
+            infoModal.style.display = 'none';
+        }
+
+        function showInfoPopup(title, message) {
+            infoModalTitle.textContent = title;
+            infoModalMessage.textContent = message;
+            infoModal.style.display = 'block';
+        }
+
+        // --- Event Listeners ---
+        collectBtn.addEventListener('click', closeModal);
+        infoOkBtn.addEventListener('click', hideInfoPopup);
+        
+        spinBtn.addEventListener('click', async () => {
+            if (isSpinning) return;
+
+            const user = auth.currentUser;
+            if (!user) {
+                showInfoPopup("Error", "You are not signed in. Please refresh.");
+                return;
+            }
+        
+            isSpinning = true;
+            spinBtn.disabled = true;
+            spinBtn.textContent = "Spinning...";
+
+            try {
+                const idToken = await user.getIdToken();
+                const functionUrl = 'https://us-central1-dravexobot.cloudfunctions.net/spinTheWheel';
+                
+                const response = await fetch(functionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + idToken,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                // If the server responded with an error code (e.g., 400 for not enough energy)
+                if (!response.ok) {
+                    throw new Error(data.message || "Spin failed on server.");
+                }
+
+                if (data.success) {
+                    // The server tells us which segment won
+                    const winningSegmentIndex = data.winningSegmentIndex;
+                    const segmentAngle = 60;
+
+                    // Add a small random offset to make it look natural
+                    const randomAngleInSegment = Math.random() * (segmentAngle - 10) + 5;
+                    const targetAngle = (winningSegmentIndex * segmentAngle) + randomAngleInSegment;
+                    const finalAngle = 360 - targetAngle;
+                    // Add multiple full spins for visual effect
+                    const totalRotation = (5 * 360) + finalAngle;
+        
+                    wheel.style.transform = `rotate(${totalRotation}deg)`;
+        
+                    // Wait for animation to finish before showing result
+                    setTimeout(() => {
+                        modalMessage.innerHTML = `You won <b>${data.finalAmount.toLocaleString()}</b> Coins!`;
+                        rewardModal.style.display = 'block';
+                        finishSpin();
+                    }, 3000); // Wait for animation
+                } else {
+                    // This case is now handled by the !response.ok check above, but as a fallback:
+                    showInfoPopup("Error", data.message || "Could not spin the wheel.");
+                    finishSpin();
+                }
+            } catch (error) {
+                console.error("Error calling spin function:", error);
+                showInfoPopup("Network Error", "Could not connect to the server. Check your internet and try again.");
+                finishSpin();
+            }
+        });
+
+        function finishSpin() {
+            isSpinning = false;
+            spinBtn.disabled = false; // Re-enable the button
+            spinBtn.textContent = "SPIN";
+        }
+
+        window.addEventListener('load', () => {
+            // Initially disable the button until Firebase auth is confirmed
+            spinBtn.disabled = true;
+        });
+    </script>
+</body>
+</html>

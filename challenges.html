@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Challenges</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            color: white;
+        }
+
+        .background-container {
+            background-image: url('background.png');
+            height: 100%;
+            width: 100%;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            text-align: center;
+            padding-top: 50px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-y: auto;
+        }
+
+        h1 {
+            font-size: 3em;
+            font-weight: 700;
+            color: #FFD700;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.7);
+            margin-bottom: 20px;
+        }
+
+        .challenge-list {
+            width: 90%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .challenge-card {
+            background-color: rgba(0, 0, 0, 0.6);
+            border: 2px solid #FFD700;
+            border-radius: 15px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            text-align: left;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .challenge-info h3 {
+            margin: 0 0 5px 0;
+            color: #FFD700;
+        }
+
+        .challenge-info p {
+            margin: 0;
+            font-size: 0.9em;
+            color: #ddd;
+        }
+
+        .progress-text {
+            font-size: 0.8em;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        .claim-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            background: linear-gradient(45deg, #28a745, #218838);
+            color: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .claim-btn:disabled {
+            background: #555;
+            color: #aaa;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .claim-btn.completed {
+            background: transparent;
+            border: 2px solid #28a745;
+            color: #28a745;
+        }
+
+        .back-button {
+            padding: 10px 25px;
+            border-radius: 10px;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        /* The Modal (background) */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 100; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+
+        /* Modal Content/Box */
+        .modal-content {
+            background: #2c3e50;
+            margin: 40% auto;
+            padding: 20px;
+            border: 2px solid #FFD700;
+            border-radius: 15px;
+            width: 80%;
+            max-width: 350px;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.5);
+            animation: slide-down 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        @keyframes slide-down {
+            from {
+                transform: translateY(-100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* The Close Button */
+        .close-button {
+            color: #aaa;
+            position: absolute;
+            top: 5px;
+            right: 15px;
+            font-size: 30px;
+            font-weight: bold;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: white;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .modal-content img {
+            width: 80px;
+            margin-bottom: 10px;
+        }
+        .modal-content h2 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="background-container">
+        <h1>Challenges</h1>
+        <div class="challenge-list" id="challenge-list">
+            <!-- Challenges will be loaded here -->
+        </div>
+        <a href="index.html" class="back-button">Back to Game</a>
+    </div>
+
+    <!-- The Info Modal -->
+    <div id="infoModal" class="modal">
+      <div class="modal-content">
+        <span class="close-button">&times;</span>
+        <img src="https://img.icons8.com/fluency/96/info.png" alt="Info"/>
+        <h2>Already Claimed</h2>
+        <p>You have already claimed this reward.</p>
+      </div>
+    </div>
+
+    <script>
+        // --- FIREBASE SETUP ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyARA7kKshwUYXrN5iiLkmA-WsF0Re14YVA",
+            authDomain: "dravexobot.firebaseapp.com",
+            databaseURL: "https://dravexobot-default-rtdb.firebaseio.com",
+            projectId: "dravexobot",
+            storageBucket: "dravexobot.firebasestorage.app",
+            messagingSenderId: "771384217218",
+            appId: "1:771384217218:web:117efa3a4b3216b70aae9b",
+            measurementId: "G-14CZ1JE8PK"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        let currentUser = null;
+        auth.onAuthStateChanged(user => {
+            if(user) {
+                currentUser = user;
+                loadChallenges();
+            } else {
+                auth.signInAnonymously();
+            }
+        });
+
+        const challengeList = document.getElementById('challenge-list');
+        const infoModal = document.getElementById('infoModal');
+        const closeButton = infoModal.querySelector('.close-button');
+
+        // Challenges Configuration
+        const challenges = [
+            { id: 'tap_100', title: 'Novice Tapper', desc: 'Tap 100 times', target: 100, reward: 500, type: 'taps' },
+            { id: 'tap_500', title: 'Pro Tapper', desc: 'Tap 500 times', target: 500, reward: 2000, type: 'taps' },
+            { id: 'tap_2000', title: 'Tap Master', desc: 'Tap 2000 times', target: 2000, reward: 5000, type: 'taps' },
+            { id: 'ads_10', title: 'Ad Watcher', desc: 'Watch 10 Ads', target: 10, reward: 5000, type: 'ads' }
+        ];
+
+        function hidePopup() {
+            infoModal.style.display = 'none';
+        }
+
+        closeButton.addEventListener('click', hidePopup);
+        window.addEventListener('click', (event) => {
+            if (event.target == infoModal) {
+                hidePopup();
+            }
+        });
+
+        async function loadChallenges() {
+            if (!currentUser) return;
+            challengeList.innerHTML = '<p style="color:white;">Loading Challenges...</p>';
+
+            try {
+                const idToken = await currentUser.getIdToken();
+                const response = await fetch('https://us-central1-dravexobot.cloudfunctions.net/getChallengeStatus', {
+                    headers: { 'Authorization': 'Bearer ' + idToken }
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    challengeList.innerHTML = '';
+                    challenges.forEach(challenge => {
+                        let progress = 0;
+                        if (challenge.type === 'taps') progress = data.totalTaps;
+                        if (challenge.type === 'ads') progress = data.totalAdsWatched;
+
+                        const isCompleted = progress >= challenge.target;
+                        const isClaimed = data.claimedChallenges.includes(challenge.id);
+
+                        const card = document.createElement('div');
+                        card.className = 'challenge-card';
+
+                        card.innerHTML = `
+                            <div class="challenge-info">
+                                <h3>${challenge.title}</h3>
+                                <p>${challenge.desc}</p>
+                                <div class="progress-text">${Math.min(progress, challenge.target)} / ${challenge.target}</div>
+                            </div>
+                            <button class="claim-btn" data-id="${challenge.id}" ${!isCompleted || isClaimed ? 'disabled' : ''}>
+                                ${isClaimed ? 'Claimed' : (isCompleted ? 'Claim 💰' : 'Locked')}
+                            </button>
+                        `;
+
+                        const button = card.querySelector('.claim-btn');
+                        if (isClaimed) button.classList.add('completed');
+
+                        button.addEventListener('click', () => {
+                            if (button.disabled) return;
+                            claimReward(challenge.id);
+                        });
+
+                        challengeList.appendChild(card);
+                    });
+                }
+            } catch (e) {
+                challengeList.innerHTML = '<p style="color:red;">Could not load challenges.</p>';
+            }
+        }
+
+        async function claimReward(id) {
+            if (!currentUser) return;
+            const button = document.querySelector(`.claim-btn[data-id="${id}"]`);
+            button.disabled = true;
+            button.textContent = 'Claiming...';
+
+            try {
+                const idToken = await currentUser.getIdToken();
+                const response = await fetch('https://us-central1-dravexobot.cloudfunctions.net/claimChallengeReward', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + idToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ challengeId: id })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert(`You claimed ${data.amount} coins!`);
+                    loadChallenges(); // Refresh UI
+                } else {
+                    alert(data.message || "Failed to claim reward.");
+                    button.disabled = false;
+                    button.textContent = 'Claim 💰';
+                }
+            } catch (e) {
+                alert("Network error.");
+                button.disabled = false;
+                button.textContent = 'Claim 💰';
+            }
+        }
+
+        // Initial load is triggered by auth state change
+    </script>
+</body>
+</html>
+                    }
+                    button.disabled = true;
+                }
+
+                card.appendChild(infoDiv);
+                card.appendChild(button);
+                challengeList.appendChild(card);
+            });
+        }
+
+        function claimReward(id, reward) {
+            let currentScore = parseInt(localStorage.getItem('coinScore')) || 0;
+            let claimedList = JSON.parse(localStorage.getItem('claimedChallenges')) || [];
+
+            localStorage.setItem('coinScore', currentScore + reward);
+            claimedList.push(id);
+            localStorage.setItem('claimedChallenges', JSON.stringify(claimedList));
+
+            // --- Save Real Transaction ---
+            const transactions = JSON.parse(localStorage.getItem('transactionHistory')) || [];
+            transactions.push({
+                type: 'Challenge Reward',
+                amount: reward,
+                date: new Date().getTime()
+            });
+            localStorage.setItem('transactionHistory', JSON.stringify(transactions));
+
+            alert(`You claimed ${reward} coins!`);
+            loadChallenges(); // Refresh UI
+        };
+
+        window.addEventListener('load', loadChallenges);
+    </script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+ {
+  "rules": {
+
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+
+        "score": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= data.val() + 50000"
+        },
+
+        "energy": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500"
+        },
+
+        "maxEnergy": {
+          ".validate": "newData.isNumber() && newData.val() >= 100 && newData.val() <= 500"
+        },
+
+        "totalTaps": {
+          ".validate": "newData.isNumber() && newData.val() >= data.val()"
+        },
+
+        "lastTap": {
+          ".validate": "newData.isNumber()"
+        },
+
+        "isBanned": {
+          ".write": false
+        },
+
+        "referrals": {
+          ".validate": "newData.isNumber() && newData.val() >= data.val()"
+        },
+
+        "spinCount": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
+        }
+
+      }
+    },
+
+    "leaderboard": {
+      ".read": true,
+      ".write": false
+    }
+
+  }
+}

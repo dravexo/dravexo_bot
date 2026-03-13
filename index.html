@@ -1,0 +1,412 @@
+ <!DOCTYPE html>
+ <html lang="en">
+ <head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Background Image</title>
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+ <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+ <!-- Firebase SDKs (Add these) -->
+ <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+ <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+ <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+ <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
+ <style>
+   /* सुनिश्चित करें कि html और body पूरी ऊंचाई लें */
+   html, body {
+     height: 100%;
+     margin: 0;
+     font-family: 'Poppins', sans-serif;
+   }
+ 
+   .background-container {
+     /* आपकी इमेज का पाथ यहाँ डालें */
+     position: relative; /* चाइल्ड एलिमेंट्स की पोजीशनिंग के लिए */
+     background-image: url('background.png');
+ 
+     /* पूरी ऊंचाई और चौड़ाई सुनिश्चित करें */
+     height: 100%;
+     width: 100%;
+ 
+     /* यह इमेज को पूरी तरह से कवर करने के लिए स्केल करता है */
+     background-size: cover;
+ 
+     /* यह इमेज को कंटेनर में केंद्रित करता है */
+     background-position: center;
+ 
+     /* इमेज को दोहराने से रोकता है */
+     background-repeat: no-repeat;
+   }
+ 
+   /* कंटेंट के लिए स्टाइल (वैकल्पिक) */
+   .content {
+     color: white;
+     text-align: center;
+     padding-top: 50px;
+   }
+
+   .tap-image {
+     margin-top: 300px; /* ऊपर से जगह बढ़ाई गई */
+     transition: transform 0.1s ease; /* क्लिक पर एनिमेशन के लिए */
+     cursor: pointer; /* कर्सर को पॉइंटर में बदलता है */
+     max-width: 400px; /* इमेज की अधिकतम चौड़ाई और बढ़ाई गई */
+     width: 90%; /* कंटेनर के हिसाब से चौड़ाई और बढ़ाई गई */
+   }
+
+   .share-button {
+     position: absolute;
+     top: 20px;
+     right: 20px;
+     padding: 10px 20px;
+     background: linear-gradient(45deg, #FFD700, #FFA500);
+     color: white;
+     border: none;
+     border-radius: 10px;
+     cursor: pointer;
+     font-size: 16px;
+     font-weight: bold;
+     animation: pulse 2s infinite;
+   }
+
+   @keyframes pulse {
+     0% {
+       box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7);
+     }
+     70% {
+       box-shadow: 0 0 0 10px rgba(255, 215, 0, 0);
+     }
+     100% {
+       box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+     }
+   }
+
+   .side-image {
+     position: absolute;
+     top: 90px; /* ऊपर से जगह */
+     max-width: 140px; /* अधिकतम चौड़ाई बढ़ाई गई */
+     cursor: pointer;
+     transition: transform 0.1s ease-in-out; /* क्लिक पर एनिमेशन के लिए */
+   }
+
+   .side-image:active {
+     transform: scale(0.95); /* क्लिक पर थोड़ा छोटा होने का प्रभाव */
+   }
+
+   .daily-bonus-image {
+     left: 20px; /* बाईं ओर */
+     top: 110px; /* ऊपर से जगह बढ़ाई गई */
+   }
+
+   .spin-image {
+     left: 20px;
+     top: 220px; /* डेली बोनस के नीचे */
+   }
+
+   .special-offer-image {
+     right: 20px; /* दाईं ओर */
+   }
+
+   .challenges-image {
+     right: 20px;
+     top: 220px; /* स्पेशल ऑफर के नीचे */
+   }
+
+   .coin-counter {
+     position: absolute;
+     top: 25px;
+     left: 20px; /* साइड में शिफ्ट किया गया */
+     transform: none;
+     background: rgba(20, 20, 20, 0.85); /* डार्क ट्रांसपेरेंट बैकग्राउंड */
+     backdrop-filter: blur(8px);
+     color: #ffffff;
+     padding: 8px 15px;
+     border-radius: 15px;
+     display: flex;
+     align-items: center;
+     border: 1px solid rgba(255, 215, 0, 0.3); /* हल्का गोल्ड बॉर्डर */
+     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+     z-index: 100;
+     min-width: 120px;
+     cursor: pointer; /* क्लिक करने योग्य बनाने के लिए */
+     transition: transform 0.2s ease;
+     text-decoration: none; /* लिंक के अंडरलाइन को हटाने के लिए */
+   }
+
+   .coin-counter:active {
+     transform: scale(0.97); /* क्लिक पर फीडबैक */
+   }
+
+   .wallet-icon {
+     width: 32px;
+     height: 32px;
+     margin-right: 10px;
+   }
+
+   .balance-container {
+     display: flex;
+     flex-direction: column;
+     line-height: 1.1;
+   }
+
+   .token-label {
+     font-size: 10px;
+     color: #aaa;
+     text-transform: uppercase;
+     letter-spacing: 0.5px;
+     font-weight: 600;
+   }
+
+   #coin-count {
+     font-size: 18px;
+     font-weight: 700;
+     color: #FFD700;
+   }
+
+   /* Coin animation style */
+   @keyframes floatUp {
+     0% { transform: translateY(0) scale(1); opacity: 1; }
+     100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
+   }
+
+   .floating-text {
+     position: absolute;
+     color: #FFD700;
+     font-weight: bold;
+     font-size: 30px;
+     pointer-events: none; /* Click through taaki fast click kar sakein */
+     animation: floatUp 0.8s ease-out forwards;
+     text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+     z-index: 999;
+   }
+
+   /* Energy Bar Styles */
+   .energy-container {
+     position: absolute;
+     bottom: 30px;
+     left: 50%;
+     transform: translateX(-50%);
+     width: 80%;
+     max-width: 300px;
+     text-align: center;
+     z-index: 100;
+   }
+
+   .energy-text {
+     color: #fff;
+     font-weight: bold;
+     font-size: 1.2em;
+     margin-bottom: 5px;
+     text-shadow: 1px 1px 2px #000;
+   }
+
+   .energy-bar-bg {
+     width: 100%;
+     height: 15px;
+     background: rgba(0,0,0,0.5);
+     border-radius: 10px;
+     border: 2px solid #FFD700;
+     overflow: hidden;
+   }
+
+   .energy-fill {
+     height: 100%;
+     background: linear-gradient(90deg, #f39c12, #e67e22);
+     width: 100%; /* JS will control this */
+     transition: width 0.2s linear;
+   }
+
+ </style>
+ </head>
+ <body>
+ 
+ <div class="background-container">
+   <button class="share-button">Share</button>
+   <a href="wallet.html" class="coin-counter">
+     <img src="https://img.icons8.com/fluency/48/wallet.png" alt="Wallet" class="wallet-icon">
+     <div class="balance-container">
+       <span class="token-label">Dravexo Balance</span>
+       <span id="coin-count">0</span>
+     </div>
+   </a>
+   <a href="daily_bonus.html">
+     <img src="daily-bonus.png" alt="Daily Bonus" class="side-image daily-bonus-image">
+   </a>
+   <a href="spin.html">
+     <img src="lucky-spin.png" alt="Spin" class="side-image spin-image">
+   </a>
+   <a href="special_offer.html">
+     <img src="special-offer.png" alt="Special Offer" class="side-image special-offer-image">
+   </a>
+   <a href="challenges.html">
+     <img src="challenges.png" alt="Challenges" class="side-image challenges-image">
+   </a>
+
+   <div class="content">
+     <img src="tap-to-earn.png" alt="Tap to Earn" class="tap-image" id="tap-to-earn-btn">
+   </div>
+
+   <div class="energy-container">
+     <div class="energy-text">⚡ <span id="energy-val">500</span> / 500</div>
+     <div class="energy-bar-bg">
+       <div class="energy-fill" id="energy-bar-fill"></div>
+     </div>
+   </div>
+
+ </div>
+ 
+ <script>
+   // बटन एलिमेंट्स को चुनना
+   const tapToEarnButton = document.getElementById('tap-to-earn-btn');
+   const coinCountDisplay = document.getElementById('coin-count');
+   const shareButton = document.querySelector('.share-button'); // This is now the Refer & Earn button
+   const energyValDisplay = document.getElementById('energy-val');
+   const energyBarFill = document.getElementById('energy-bar-fill');
+   
+   // --- FIREBASE CONFIGURATION (START) ---
+   // आपको Firebase Console से अपनी सेटिंग्स यहाँ पेस्ट करनी होंगी
+   const firebaseConfig = {
+       apiKey: "AIzaSyARA7kKshwUYXrN5iiLkmA-WsF0Re14YVA",
+       authDomain: "dravexobot.firebaseapp.com",
+       // Database URL automatically inferred from project ID
+       databaseURL: "https://dravexobot-default-rtdb.firebaseio.com",
+       projectId: "dravexobot",
+       storageBucket: "dravexobot.firebasestorage.app",
+       messagingSenderId: "771384217218",
+       appId: "1:771384217218:web:117efa3a4b3216b70aae9b",
+       measurementId: "G-14CZ1JE8PK"
+   };
+
+   // Firebase Initialize
+   let db;
+   let userRef;
+
+   // --- Firebase Functions Setup ---
+   // We will use fetch directly, no need for the functions SDK variable here.
+
+   try {
+       firebase.initializeApp(firebaseConfig);
+       const auth = firebase.auth();
+       db = firebase.database();
+       
+       auth.onAuthStateChanged((user) => {
+           if (user) {
+               const userId = user.uid;
+               // localStorage.setItem('userId', userId); // Removed insecure local storage dependency
+               userRef = db.ref('users/' + userId);
+               
+               // Listen for data changes from Server
+               userRef.on('value', (snapshot) => {
+                   const data = snapshot.val();
+                   if (data) {
+                       if (data.isBanned) {
+                           alert("Your account has been banned due to suspicious activity.");
+                           window.location.reload(); 
+                           return;
+                       }
+                       // Server is the source of truth.
+                       const score = data.score || 0;
+                       const energy = data.energy !== undefined ? data.energy : MAX_ENERGY;
+                       
+                       coinCountDisplay.textContent = score;
+                       updateEnergyUI(energy);
+                   } 
+               });
+           } else {
+               // अगर लॉग इन नहीं है, तो Anonymous (गुमनाम) लॉग इन करें
+               auth.signInAnonymously().catch(console.error);
+           }
+       });
+   } catch (error) {
+       console.error("Firebase not connected. Replace config keys.", error);
+   }
+   // --- FIREBASE CONFIGURATION (END) ---
+
+   // Energy System
+   const MAX_ENERGY = 500;
+   
+   function updateEnergyUI(energy) {
+     energyValDisplay.textContent = Math.floor(energy);
+     energyBarFill.style.width = `${(energy / MAX_ENERGY) * 100}%`;
+   }
+
+   // जब भी यह पेज फोकस में आए तो स्कोर अपडेट करें (डेली बोनस पेज से वापस आने पर)
+   // window.addEventListener('focus', () => { ... }); // Removed: Realtime listener handles this now
+
+   // टैप टू अर्न बटन पर क्लिक इवेंट
+   tapToEarnButton.addEventListener('click', (e) => {
+     const user = firebase.auth().currentUser;
+     if (!user) return; // Wait for user to be logged in
+
+     // --- FOR VISUAL FEEDBACK (even before server responds) ---
+     // We can predict the outcome for a smoother UX
+     // But actual data update comes from userRef.on()
+     /* 
+     // OPTIONAL: Optimistic UI update (makes game feel faster)
+     let currentEnergy = parseInt(energyValDisplay.textContent) || 0;
+     if (currentEnergy >= 1) {
+        updateEnergyUI(currentEnergy - 1);
+        const baseTapReward = 5; // This is just for the floating text animation
+        showFloatingText(e, baseTapReward);
+        animateTapButton();
+     }
+     */
+
+     // SERVER CALL using fetch
+     user.getIdToken().then(idToken => {
+        const functionUrl = 'https://us-central1-dravexobot.cloudfunctions.net/processTap';
+        fetch(functionUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + idToken,
+                'Content-Type': 'application/json'
+            }
+        }).then(response => {
+            if (!response.ok) {
+                // Throw an error to be caught by the .catch block
+                return response.json().then(err => { throw new Error(err.message || 'Tap request failed') });
+            }
+            // Success is handled by the realtime listener
+        }).catch(err => {
+            console.error("Tap failed:", err.message);
+        });
+     });
+     
+     // Visuals
+     showFloatingText(e, 5);
+     animateTapButton();
+   });
+
+   function showFloatingText(e, reward) {
+     const floatingText = document.createElement('div');
+     floatingText.textContent = `+${reward} 💰`;
+     floatingText.classList.add('floating-text');
+     floatingText.style.left = `${e.pageX}px`;
+     floatingText.style.top = `${e.pageY}px`;
+     document.body.appendChild(floatingText);
+     setTimeout(() => { floatingText.remove(); }, 800);
+   }
+
+   function animateTapButton() {
+     tapToEarnButton.style.transform = 'scale(0.95)';
+     setTimeout(() => {
+       tapToEarnButton.style.transform = 'scale(1)';
+     }, 100);
+   }
+
+   // शेयर बटन पर क्लिक इवेंट
+   shareButton.addEventListener('click', () => {
+     // अब यह फ्रेंड्स पेज पर रीडायरेक्ट करेगा
+     window.location.href = 'friends.html';
+   });
+
+   // Energy Regeneration Loop (1 energy per second)
+   // REMOVED: Server handles energy regen via scheduled functions or on-read calculation.
+
+   // --- SAVE COST: PERIODIC FIREBASE UPDATE ---
+   // REMOVED: Client should NEVER write score directly.
+
+ </script>
+ </body>
+ </html>
+ 
