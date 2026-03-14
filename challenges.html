@@ -7,6 +7,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <style>
         html, body {
             height: 100%;
@@ -211,6 +215,7 @@
         };
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
+        const db = firebase.database();
 
         let currentUser = null;
         auth.onAuthStateChanged(user => {
@@ -250,21 +255,18 @@
             challengeList.innerHTML = '<p style="color:white;">Loading Challenges...</p>';
 
             try {
-                const idToken = await currentUser.getIdToken();
-                const response = await fetch('https://us-central1-dravexobot.cloudfunctions.net/getChallengeStatus', {
-                    headers: { 'Authorization': 'Bearer ' + idToken }
-                });
-                const data = await response.json();
-
-                if (data.success) {
+                const snapshot = await db.ref(`users/${currentUser.uid}`).once('value');
+                const data = snapshot.val() || {};
+                
+                if (data) {
                     challengeList.innerHTML = '';
                     challenges.forEach(challenge => {
                         let progress = 0;
-                        if (challenge.type === 'taps') progress = data.totalTaps;
-                        if (challenge.type === 'ads') progress = data.totalAdsWatched;
+                        if (challenge.type === 'taps') progress = data.totalTaps || 0;
+                        if (challenge.type === 'ads') progress = data.totalAdsWatched || 0;
 
                         const isCompleted = progress >= challenge.target;
-                        const isClaimed = data.claimedChallenges.includes(challenge.id);
+                        const isClaimed = (data.claimedChallenges || []).includes(challenge.id);
 
                         const card = document.createElement('div');
                         card.className = 'challenge-card';
@@ -285,7 +287,7 @@
 
                         button.addEventListener('click', () => {
                             if (button.disabled) return;
-                            claimReward(challenge.id);
+                            claimReward(challenge.id, challenge.reward);
                         });
 
                         challengeList.appendChild(card);
@@ -296,31 +298,24 @@
             }
         }
 
-        async function claimReward(id) {
+        async function claimReward(id, reward) {
             if (!currentUser) return;
             const button = document.querySelector(`.claim-btn[data-id="${id}"]`);
             button.disabled = true;
             button.textContent = 'Claiming...';
 
             try {
-                const idToken = await currentUser.getIdToken();
-                const response = await fetch('https://us-central1-dravexobot.cloudfunctions.net/claimChallengeReward', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': 'Bearer ' + idToken,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ challengeId: id })
+                const userRef = db.ref(`users/${currentUser.uid}`);
+                await userRef.transaction(userData => {
+                    if(!userData) return;
+                    userData.score = (userData.score || 0) + reward;
+                    if(!userData.claimedChallenges) userData.claimedChallenges = [];
+                    userData.claimedChallenges.push(id);
+                    return userData;
                 });
-                const data = await response.json();
-                if (data.success) {
-                    alert(`You claimed ${data.amount} coins!`);
-                    loadChallenges(); // Refresh UI
-                } else {
-                    alert(data.message || "Failed to claim reward.");
-                    button.disabled = false;
-                    button.textContent = 'Claim 💰';
-                }
+                
+                alert(`You claimed ${reward} coins!`);
+                loadChallenges();
             } catch (e) {
                 alert("Network error.");
                 button.disabled = false;
@@ -329,41 +324,6 @@
         }
 
         // Initial load is triggered by auth state change
-    </script>
-</body>
-</html>
-                    }
-                    button.disabled = true;
-                }
-
-                card.appendChild(infoDiv);
-                card.appendChild(button);
-                challengeList.appendChild(card);
-            });
-        }
-
-        function claimReward(id, reward) {
-            let currentScore = parseInt(localStorage.getItem('coinScore')) || 0;
-            let claimedList = JSON.parse(localStorage.getItem('claimedChallenges')) || [];
-
-            localStorage.setItem('coinScore', currentScore + reward);
-            claimedList.push(id);
-            localStorage.setItem('claimedChallenges', JSON.stringify(claimedList));
-
-            // --- Save Real Transaction ---
-            const transactions = JSON.parse(localStorage.getItem('transactionHistory')) || [];
-            transactions.push({
-                type: 'Challenge Reward',
-                amount: reward,
-                date: new Date().getTime()
-            });
-            localStorage.setItem('transactionHistory', JSON.stringify(transactions));
-
-            alert(`You claimed ${reward} coins!`);
-            loadChallenges(); // Refresh UI
-        };
-
-        window.addEventListener('load', loadChallenges);
     </script>
 </body>
 </html>

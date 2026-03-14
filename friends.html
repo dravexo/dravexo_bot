@@ -8,6 +8,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Adsgram Script -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://adsgram.ai/js/adsgram.js"></script>
     <style>
         /* Basic styles from other pages */
@@ -15,7 +18,8 @@
         .background-container {
             background-image: url('background.png');
             height: 100%; width: 100%; background-size: cover;
-            background-position: center; text-align: center; padding-top: 50px;
+            background-position: center; text-align: center;
+            padding: 50px 10px 20px 10px;
             box-sizing: border-box; display: flex; flex-direction: column;
             align-items: center; overflow-y: auto;
         }
@@ -57,14 +61,15 @@
             text-align: left;
         }
         .copy-btn {
-            background: #0088cc;
+            background: linear-gradient(45deg, #0088cc, #005f8e);
             color: white;
             border: none;
-            padding: 8px 15px;
+            padding: 10px 20px;
             border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
             margin-left: 10px;
+            transition: transform 0.2s;
         }
 
         .friend-list { list-style: none; padding: 0; }
@@ -129,10 +134,10 @@
 
         <div class="card">
             <h2>Your Referral Link</h2>
-            <p>Your friend gets <b>5,000 Dravexo</b> for joining, and you get huge milestone bonuses + <b>2% lifetime commission</b> on their earnings!</p>
+            <p>Share your link! Your friend gets a <b>5,000 coin headstart</b>, and you get massive bonuses for each milestone they hit. It's a win-win!</p>
             <div class="referral-link-container">
                 <span class="referral-link" id="ref-link"></span>
-                <button class="copy-btn" id="copy-btn">Copy</button>
+                <button class="copy-btn" id="share-btn">Share</button>
             </div>
         </div>
 
@@ -184,7 +189,7 @@
 
     <script>
         const refLinkEl = document.getElementById('ref-link');
-        const copyBtn = document.getElementById('copy-btn');
+        const shareBtn = document.getElementById('share-btn');
         const friendListEl = document.getElementById('friend-list');
         const friendCountEl = document.getElementById('friend-count');
         const friendsInvitedStat = document.getElementById('friends-invited-stat');
@@ -206,26 +211,38 @@
         };
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
+        const db = firebase.database();
 
         let currentUser = null;
         auth.onAuthStateChanged(user => {
             if(user) {
                 currentUser = user;
-                const referralLink = `https://t.me/dravexo_bot?start=${user.uid}`;
-                refLinkEl.textContent = referralLink;
                 loadServerData();
             } else {
                 auth.signInAnonymously();
             }
         });
 
-        copyBtn.addEventListener('click', () => {
-            navigator.clipboard.writeText(referralLink).then(() => {
-                copyBtn.textContent = 'Copied!';
-                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
-            }).catch(err => {
-                alert('Failed to copy link.');
-            });
+        shareBtn.addEventListener('click', async () => {
+            const referralLink = refLinkEl.textContent;
+            const shareText = `🔥 Yo! I'm mining Dravexo coins! Join with my link to get a FREE 5,000 coin bonus, and I'll get one too! 🚀 Let's get rich together! 💰`;
+
+            if (navigator.share) {
+                // Use Web Share API if available
+                try {
+                    await navigator.share({
+                        title: 'Join Dravexo!',
+                        text: shareText,
+                        url: referralLink,
+                    });
+                } catch (err) {
+                    console.error('Share failed:', err.message);
+                }
+            } else {
+                // Fallback to Telegram share link
+                const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(shareText)}`;
+                window.open(telegramUrl, '_blank');
+            }
         });
 
         // --- Simulate and load friends ---
@@ -241,57 +258,53 @@
             { id: 'm5', required: 25, reward: 1000000 }
         ];
 
-        function loadFriends() {
-            const friendCount = fakeFriends.length;
-            friendCountEl.textContent = friendCount;
-            friendsInvitedStat.textContent = friendCount;
-            localStorage.setItem('referredFriendsCount', friendCount); // Save for main game
+        async function loadServerData() {
+            if(!currentUser) return;
+            
+            try {
+                // Fetch referral code and stats in parallel
+                // Use UID as code for free version
+                refLinkEl.textContent = `https://dravexo.github.io/dravexo_bot/index.html?start=${currentUser.uid}`;
+                
+                // Fetch basic stats directly
+                const snap = await db.ref(`users/${currentUser.uid}`).once('value');
+                const data = snap.val() || {};
+                invitedCount = data.referralCount || 0;
+                claimedMilestones = data.claimedMilestones || [];
+                updateUI();
 
-            // Calculate and display boost
-            const boostPercentage = friendCount * 5; // 5% per friend
+            } catch(e) {
+                console.error("Error fetching referral data", e);
+            }
+        }
+
+        function updateUI() {
+            friendCountEl.textContent = invitedCount;
+            friendsInvitedStat.textContent = invitedCount;
+            
+            // Bonus logic (This should strictly be server side in next iteration)
+            // For now, it's just a visual representation
+            const boostPercentage = invitedCount * 5; // 5% per friend
             const baseRegenRate = 1.0;
             const boostedRegenRate = baseRegenRate * (1 + (boostPercentage / 100));
             
             friendsBoostStat.textContent = `+${boostPercentage}%`;
             newRegenRate.textContent = `${boostedRegenRate.toFixed(2)}/sec`;
 
-            if (fakeFriends.length === 0) {
-                friendListEl.innerHTML = '<p style="color: #888;">You haven\'t invited any friends yet.</p>';
-                return;
+            if (invitedCount === 0) {
+                friendListEl.innerHTML = `<p style="color: #888;">You haven't invited any friends yet.</p>`;
+            } else {
+                friendListEl.innerHTML = `<p style="color: #FFD700;">You have invited ${invitedCount} friends!</p>`;
             }
-
-            friendListEl.innerHTML = '';
-            fakeFriends.slice().reverse().forEach(friend => {
-                const item = document.createElement('li');
-                item.className = 'friend-item';
-                item.innerHTML = `
-                    <img src="https://i.pravatar.cc/40?u=${friend.name}" alt="Avatar">
-                    <div class="friend-info">
-                        <div class="name">${friend.name}</div>
-                        <div class="friend-bonus">Got 5,000 Dravexo!</div>
-                    </div>
-                `;
-                friendListEl.appendChild(item);
-            });
+            
+            renderMilestones();
         }
 
-        function updateTotalBonusStat() {
-            let totalBonus = 0;
-            claimedMilestones.forEach(claimedId => {
-                const milestone = milestones.find(m => m.id === claimedId);
-                if (milestone) {
-                    totalBonus += milestone.reward;
-                }
-            });
-            bonusEarnedStat.textContent = totalBonus.toLocaleString();
-        }
-
-        function loadMilestones() {
-            const friendCount = fakeFriends.length;
+        function renderMilestones() {
             milestonesListEl.innerHTML = '';
             milestones.forEach(ms => {
                 const isClaimed = claimedMilestones.includes(ms.id);
-                const canClaim = friendCount >= ms.required && !isClaimed;
+                const canClaim = invitedCount >= ms.required && !isClaimed;
                 
                 const milestoneEl = document.createElement('div');
                 milestoneEl.className = 'milestone';
@@ -311,35 +324,37 @@
             });
 
             document.querySelectorAll('.claim-milestone-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
+                btn.addEventListener('click', async (e) => {
                     if (e.target.disabled) return;
+                    if (!currentUser) return;
 
-                    const id = e.target.getAttribute('data-id');
+                    const milestoneId = e.target.getAttribute('data-id');
                     const reward = parseInt(e.target.getAttribute('data-reward'));
-
-                    let currentScore = parseInt(localStorage.getItem('coinScore')) || 0;
-                    currentScore += reward;
-                    localStorage.setItem('coinScore', currentScore);
+                    e.target.textContent = "Processing...";
                     
-                    claimedMilestones.push(id);
-                    localStorage.setItem('claimedMilestones', JSON.stringify(claimedMilestones));
+                    try {
+                        const userRef = db.ref(`users/${currentUser.uid}`);
+                        await userRef.transaction(userData => {
+                            if (!userData) return;
+                            // Add reward and mark as claimed
+                            userData.score = (userData.score || 0) + reward;
+                            if (!userData.claimedMilestones) userData.claimedMilestones = [];
+                            userData.claimedMilestones.push(milestoneId);
+                            // Update total referral earnings
+                            userData.referralEarnings = (userData.referralEarnings || 0) + reward;
+                            return userData;
+                        });
 
-                    const transactions = JSON.parse(localStorage.getItem('transactionHistory')) || [];
-                    transactions.push({ type: 'Milestone Bonus', amount: reward, date: new Date().getTime() });
-                    localStorage.setItem('transactionHistory', JSON.stringify(transactions));
-                    
-                    alert(`Milestone complete! You claimed ${reward.toLocaleString()} Dravexo!`);
-                    updateTotalBonusStat();
-                    loadMilestones(); // Refresh buttons
+                        alert(`You claimed ${reward.toLocaleString()} Dravexo!`);
+                        loadServerData(); // Refresh UI
+
+                    } catch(err) {
+                        console.error(err);
+                        alert("Network error.");
+                    }
                 });
             });
         }
-
-        window.addEventListener('load', () => {
-            loadFriends();
-            loadMilestones();
-            updateTotalBonusStat();
-        });
     </script>
 </body>
 </html>

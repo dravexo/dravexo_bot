@@ -236,6 +236,7 @@
         };
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
+        const db = firebase.database();
 
         let currentUser = null;
         auth.onAuthStateChanged(user => {
@@ -335,25 +336,23 @@
                 // 1. Show the ad
                 await AdController.show();
 
-                // 2. If ad was successful, claim reward from server
-                const idToken = await currentUser.getIdToken();
-                const response = await fetch('https://us-central1-dravexobot.cloudfunctions.net/claimAdReward', {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + idToken }
+                // 2. Claim Reward Locally & Update DB
+                const reward = Math.floor(Math.random() * (1000 - 100 + 1)) + 100;
+                
+                const userRef = db.ref(`users/${currentUser.uid}`);
+                await userRef.transaction(data => {
+                     if(data) data.score = (data.score || 0) + reward;
+                     return data;
                 });
-                const data = await response.json();
 
-                if (data.success) {
-                    showRewardPopup(data.amount);
-                    // Check if a cooldown needs to be started locally
-                    const adsWatched = (parseInt(localStorage.getItem(ADS_WATCHED_COUNT_KEY) || '0')) + 1;
-                    if (adsWatched >= ADS_WATCH_LIMIT) {
-                        localStorage.setItem(AD_COOLDOWN_START_KEY, Date.now());
-                    }
-                    localStorage.setItem(ADS_WATCHED_COUNT_KEY, adsWatched);
-                } else {
-                    alert(data.message || "Failed to claim reward.");
+                showRewardPopup(reward);
+                
+                const adsWatched = (parseInt(localStorage.getItem(ADS_WATCHED_COUNT_KEY) || '0')) + 1;
+                if (adsWatched >= ADS_WATCH_LIMIT) {
+                    localStorage.setItem(AD_COOLDOWN_START_KEY, Date.now());
                 }
+                localStorage.setItem(ADS_WATCHED_COUNT_KEY, adsWatched);
+
             } catch (error) {
                 // Ad was skipped or a network error occurred
                 alert("Ad was skipped or failed to load. No reward given.");

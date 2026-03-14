@@ -1,54 +1,24 @@
- {
+{
   "rules": {
-
-    ".read": false,
-    ".write": false,
-
     "users": {
+      ".indexOn": ["score"],
       "$uid": {
-
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid",
-
-        "score": {
-          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= data.val() + 50000"
-        },
-
-        "energy": {
-          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500"
-        },
-
-        "maxEnergy": {
-          ".validate": "newData.isNumber() && newData.val() >= 100 && newData.val() <= 500"
-        },
-
-        "totalTaps": {
-          ".validate": "newData.isNumber() && newData.val() >= data.val()"
-        },
-
-        "lastTap": {
-          ".validate": "newData.isNumber()"
-        },
-
-        "isBanned": {
-          ".write": false
-        },
-
-        "referrals": {
-          ".validate": "newData.isNumber() && newData.val() >= data.val()"
-        },
-
-        "spinCount": {
-          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
-        }
-
+        ".write": "auth != null && auth.uid === $uid"
       }
     },
-
+    "pendingReferrals": {
+      "$referrerId": {
+        ".read": "auth != null && auth.uid === $referrerId",
+        "$newUserId": {
+          
+           ".write": "auth != null && auth.uid === $newUserId",
+           ".validate": "newData.exists()"
+        }
+      }
+    },
     "leaderboard": {
-      ".read": true,
-      ".write": false
+       ".read": true
     }
-
   }
 }

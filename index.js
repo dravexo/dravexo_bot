@@ -7,7 +7,7 @@ const db = admin.database();
 
 // Configure CORS to ONLY allow requests from your local development server.
 // For production, you might want to restrict this further or allow your deployed web app's URL.
-const corsHandler = cors({ origin: "https://dravexo.github.io/dravexo_bot/" });
+const corsHandler = cors({ origin: true }); // 'true' allows all origins (easiest for testing) or use "https://dravexo.github.io"
 
 // --- RATE LIMITING & BOT DETECTION CONFIG ---
 const RATE_LIMITS = {
@@ -324,48 +324,87 @@ exports.claimReferralMilestone = functions.https.onRequest((req, res) => {
 });
 
 // ==================================================================
-// 6. SUBMIT REFERRAL (Secure)
+// Helper to generate a unique referral code
 // ==================================================================
-exports.submitReferral = functions.https.onRequest((req, res) => {
+async function createUniqueReferralCode(userId) {
+    const codesRef = db.ref('referralCodes');
+    let code;
+    let isUnique = false;
+    while (!isUnique) {
+        // Generate a 6-character alphanumeric code
+        code = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const snapshot = await codesRef.child(code).once('value');
+        if (!snapshot.exists()) {
+            isUnique = true;
+        }
+    }
+    // Map the code to the user ID and vice-versa
+    await codesRef.child(code).set(userId);
+    await db.ref(`users/${userId}/referralCode`).set(code);
+    return code;
+}
+
+exports.getReferralCode = functions.https.onRequest((req, res) => {
     corsHandler(req, res, async () => {
         const userId = await getAuthenticatedUser(req, res);
         if (!userId) return;
-        
-        const { referrerId } = req.body;
+        const userSnap = await db.ref(`users/${userId}/referralCode`).once('value');
+        let code = userSnap.val();
+        if (!code) code = await createUniqueReferralCode(userId);
+        res.status(200).json({ success: true, code: code });
+    });
+});
+// ==================================================================
+// 6. SUBMIT REFERRAL (Secure)
+// ==================================================================
+// 9. SUBMIT REFERRAL CODE (New Feature)
+// ==================================================================
+exports.submitReferralCode = functions.https.onRequest((req, res) => {
+    corsHandler(req, res, async () => {
+        const userId = await getAuthenticatedUser(req, res);
+        if (!userId) return;
 
-        // Prevents self-referral
-        if (!referrerId || referrerId === userId) {
-             res.status(400).json({ success: false, message: "Invalid referrer." });
-             return;
+        const { referralCode } = req.body; // The unique code of the referrer
+
+        if (!referralCode) {
+            return res.status(400).json({ success: false, message: "Invalid referral code." });
         }
 
-        const userRef = db.ref(`users/${userId}`);
-        const referrerRef = db.ref(`users/${referrerId}`);
-
         try {
-            // Check if user already has a referrer
-            const userSnap = await userRef.once('value');
-            const userData = userSnap.val();
-            
-            if (userData && userData.referrer) {
-                res.status(400).json({ success: false, message: "Already referred." });
-                return;
+            // 1. Find the referrer's UID from the code
+            const codeSnap = await db.ref(`referralCodes/${referralCode.toUpperCase()}`).once('value');
+            if (!codeSnap.exists()) {
+                return res.status(404).json({ success: false, message: "Referral code not found." });
+            }
+            const referrerId = codeSnap.val();
+
+            // Self-referral check
+            if (referrerId === userId) {
+                return res.status(400).json({ success: false, message: "You cannot use your own code." });
             }
 
-            // Update Referrer Data
-            await referrerRef.transaction(referrerData => {
-                if (!referrerData) return;
-                referrerData.referralCount = (referrerData.referralCount || 0) + 1;
-                // Add friend to list (limit size if needed or store elsewhere)
-                // referrerData.referrals = ... 
-                return referrerData;
+            // 2. Check if user has already used a code
+            const userRef = db.ref(`users/${userId}`);
+            const userSnap = await userRef.once('value');
+            const userData = userSnap.val() || {};
+            if (userData.referredBy) {
+                return res.status(400).json({ success: false, message: "You have already used a referral code." });
+            }
+
+            // 3. Process Referral
+            const referrerRef = db.ref(`users/${referrerId}`);
+            await referrerRef.transaction(data => {
+                if (!data) return;
+                data.referralCount = (data.referralCount || 0) + 1;
+                data.score = (data.score || 0) + 5000; // Bonus for referrer
+                return data;
             });
+            
+            await userRef.update({ referredBy: referrerId, score: (userData.score || 0) + 2500 }); // Bonus for user
 
-            // Set referrer for current user
-            await userRef.update({ referrer: referrerId });
-
-            res.status(200).json({ success: true, message: "Referral successful!" });
-        } catch (e) {
+            res.status(200).json({ success: true, message: "Referral code applied! You got 2500 coins." });
+        } catch (error) {
+            console.error("Referral Error:", error);
             res.status(500).json({ success: false, message: "Server error." });
         }
     });

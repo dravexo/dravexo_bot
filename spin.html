@@ -11,8 +11,8 @@
     <script src="https://adsgram.ai/js/adsgram.js"></script>
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
     <style>
         html, body { height: 100%; margin: 0; font-family: 'Poppins', sans-serif; color: white; }
         .background-container {
@@ -288,9 +288,11 @@
 
         // --- Firebase Initialize ---
         let auth;
+        let db;
         try {
             firebase.initializeApp(firebaseConfig);
             auth = firebase.auth();
+            db = firebase.database();
 
             auth.onAuthStateChanged((user) => {
                 if (user) {
@@ -343,53 +345,52 @@
             spinBtn.disabled = true;
             spinBtn.textContent = "Spinning...";
 
+            const userId = user.uid;
+            const userRef = db.ref('users/' + userId);
+            const SPIN_COST = 100;
+
             try {
-                const idToken = await user.getIdToken();
-                const functionUrl = 'https://us-central1-dravexobot.cloudfunctions.net/spinTheWheel';
-                
-                const response = await fetch(functionUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': 'Bearer ' + idToken,
-                        'Content-Type': 'application/json'
-                    }
+                // 1. Check Energy Locally/Direct DB
+                const snapshot = await userRef.once('value');
+                const userData = snapshot.val();
+                const currentEnergy = userData.energy || 0;
+
+                if (currentEnergy < SPIN_COST) {
+                    throw new Error("Not enough energy (Need 100)");
+                }
+
+                // 2. Determine Prize Locally
+                const rewards = [
+                    { value: 500 }, { value: 1000 },
+                    { value: 2000 }, { value: 100 },
+                    { value: 5000 }, { value: 50000 }
+                ];
+                const winningSegmentIndex = Math.floor(Math.random() * rewards.length);
+                const winningReward = rewards[winningSegmentIndex].value;
+
+                // 3. Update DB Direct
+                await userRef.update({
+                    energy: currentEnergy - SPIN_COST,
+                    score: (userData.score || 0) + winningReward
                 });
 
-                const data = await response.json();
-
-                // If the server responded with an error code (e.g., 400 for not enough energy)
-                if (!response.ok) {
-                    throw new Error(data.message || "Spin failed on server.");
-                }
-
-                if (data.success) {
-                    // The server tells us which segment won
-                    const winningSegmentIndex = data.winningSegmentIndex;
-                    const segmentAngle = 60;
-
-                    // Add a small random offset to make it look natural
-                    const randomAngleInSegment = Math.random() * (segmentAngle - 10) + 5;
-                    const targetAngle = (winningSegmentIndex * segmentAngle) + randomAngleInSegment;
-                    const finalAngle = 360 - targetAngle;
-                    // Add multiple full spins for visual effect
-                    const totalRotation = (5 * 360) + finalAngle;
-        
-                    wheel.style.transform = `rotate(${totalRotation}deg)`;
-        
-                    // Wait for animation to finish before showing result
-                    setTimeout(() => {
-                        modalMessage.innerHTML = `You won <b>${data.finalAmount.toLocaleString()}</b> Coins!`;
-                        rewardModal.style.display = 'block';
-                        finishSpin();
-                    }, 3000); // Wait for animation
-                } else {
-                    // This case is now handled by the !response.ok check above, but as a fallback:
-                    showInfoPopup("Error", data.message || "Could not spin the wheel.");
+                // 4. Animate
+                const segmentAngle = 60;
+                const randomAngleInSegment = Math.random() * (segmentAngle - 10) + 5;
+                const targetAngle = (winningSegmentIndex * segmentAngle) + randomAngleInSegment;
+                const finalAngle = 360 - targetAngle;
+                const totalRotation = (5 * 360) + finalAngle;
+    
+                wheel.style.transform = `rotate(${totalRotation}deg)`;
+    
+                setTimeout(() => {
+                    modalMessage.innerHTML = `You won <b>${winningReward.toLocaleString()}</b> Coins!`;
+                    rewardModal.style.display = 'block';
                     finishSpin();
-                }
+                }, 3000);
+
             } catch (error) {
-                console.error("Error calling spin function:", error);
-                showInfoPopup("Network Error", "Could not connect to the server. Check your internet and try again.");
+                showInfoPopup("Error", error.message);
                 finishSpin();
             }
         });

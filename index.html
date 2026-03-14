@@ -11,7 +11,6 @@
  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
- <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
  <style>
    /* सुनिश्चित करें कि html और body पूरी ऊंचाई लें */
    html, body {
@@ -280,9 +279,8 @@
    // Firebase Initialize
    let db;
    let userRef;
-
-   // --- Firebase Functions Setup ---
-   // We will use fetch directly, no need for the functions SDK variable here.
+   let score = 0;
+   let energy = 500;
 
    try {
        firebase.initializeApp(firebaseConfig);
@@ -305,11 +303,67 @@
                            return;
                        }
                        // Server is the source of truth.
-                       const score = data.score || 0;
-                       const energy = data.energy !== undefined ? data.energy : MAX_ENERGY;
+                       score = data.score || 0;
+                       energy = data.energy !== undefined ? data.energy : MAX_ENERGY;
                        
                        coinCountDisplay.textContent = score;
                        updateEnergyUI(energy);
+
+                       // --- SECURE REFERRAL LOGIC (CLIENT-SIDE) ---
+                       // Check if this is a new user and if they came from a referral link
+                       if (!data.score && !data.referredBy) { // New user check
+                           const urlParams = new URLSearchParams(window.location.search);
+                           const referrerId = urlParams.get('start');
+
+                           if (referrerId && referrerId !== userId) {
+                               console.log(`Applying referral from: ${referrerId}`);
+                               
+                               // 1. Give bonus to ME (New User)
+                               userRef.update({
+                                   score: (score || 0) + 5000, // New user bonus
+                                   referredBy: referrerId
+                               });
+                               
+                               // 2. Create a pending referral for the REFERRER
+                               // We write to pendingReferrals/{referrerId}/{myId}
+                               const pendingRef = db.ref(`pendingReferrals/${referrerId}/${userId}`);
+                               pendingRef.set({
+                                   timestamp: firebase.database.ServerValue.TIMESTAMP
+                               }).catch(e => console.error("Could not send referral", e));
+
+                               alert("Welcome! You've received a 5,000 coin bonus for using a referral link!");
+                               
+                               try {
+                                 window.history.replaceState({}, document.title, window.location.pathname);
+                               } catch(e) {}
+                           }
+                       }
+
+                       // 2. I AM THE REFERRER (Check if I have new referrals)
+                       // Check pendingReferrals/{myId}
+                       const myPendingRefs = db.ref(`pendingReferrals/${userId}`);
+                       myPendingRefs.once('value', (snapshot) => {
+                           if (snapshot.exists()) {
+                               const referrals = snapshot.val();
+                               const count = Object.keys(referrals).length;
+                               const rewardPerReferral = 25000;
+                               const totalBonus = count * rewardPerReferral;
+                               
+                               // Claim bonuses
+                               const updates = {};
+                               updates['score'] = (score || 0) + totalBonus;
+                               updates['referralCount'] = (data.referralCount || 0) + count;
+                               updates['referralEarnings'] = (data.referralEarnings || 0) + totalBonus;
+                               
+                               userRef.update(updates).then(() => {
+                                   // Delete processed referrals so we don't count them again
+                                   myPendingRefs.remove();
+                                   alert(`You earned ${totalBonus.toLocaleString()} coins from ${count} new referrals!`);
+                               });
+                           }
+                       });
+                       // --- END OF REFERRAL LOGIC ---
+
                    } 
                });
            } else {
@@ -330,51 +384,30 @@
      energyBarFill.style.width = `${(energy / MAX_ENERGY) * 100}%`;
    }
 
-   // जब भी यह पेज फोकस में आए तो स्कोर अपडेट करें (डेली बोनस पेज से वापस आने पर)
-   // window.addEventListener('focus', () => { ... }); // Removed: Realtime listener handles this now
-
    // टैप टू अर्न बटन पर क्लिक इवेंट
    tapToEarnButton.addEventListener('click', (e) => {
      const user = firebase.auth().currentUser;
-     if (!user) return; // Wait for user to be logged in
+     if (!user || !userRef) return;
 
-     // --- FOR VISUAL FEEDBACK (even before server responds) ---
-     // We can predict the outcome for a smoother UX
-     // But actual data update comes from userRef.on()
-     /* 
-     // OPTIONAL: Optimistic UI update (makes game feel faster)
-     let currentEnergy = parseInt(energyValDisplay.textContent) || 0;
-     if (currentEnergy >= 1) {
-        updateEnergyUI(currentEnergy - 1);
-        const baseTapReward = 5; // This is just for the floating text animation
-        showFloatingText(e, baseTapReward);
-        animateTapButton();
+     // CLIENT SIDE LOGIC (FREE PLAN)
+     if (energy >= 1) {
+         // 1. Update Local Variables
+         energy -= 1;
+         score += 5; // Tap Reward
+
+         // 2. Update UI Immediately
+         coinCountDisplay.textContent = score;
+         updateEnergyUI(energy);
+         showFloatingText(e, 5);
+         animateTapButton();
+
+         // 3. Save to Firebase (Direct Write)
+         userRef.update({
+             score: score,
+             energy: energy,
+             totalTaps: firebase.database.ServerValue.increment(1)
+         }).catch(err => console.error("Save failed", err));
      }
-     */
-
-     // SERVER CALL using fetch
-     user.getIdToken().then(idToken => {
-        const functionUrl = 'https://us-central1-dravexobot.cloudfunctions.net/processTap';
-        fetch(functionUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + idToken,
-                'Content-Type': 'application/json'
-            }
-        }).then(response => {
-            if (!response.ok) {
-                // Throw an error to be caught by the .catch block
-                return response.json().then(err => { throw new Error(err.message || 'Tap request failed') });
-            }
-            // Success is handled by the realtime listener
-        }).catch(err => {
-            console.error("Tap failed:", err.message);
-        });
-     });
-     
-     // Visuals
-     showFloatingText(e, 5);
-     animateTapButton();
    });
 
    function showFloatingText(e, reward) {
@@ -396,15 +429,22 @@
 
    // शेयर बटन पर क्लिक इवेंट
    shareButton.addEventListener('click', () => {
-     // अब यह फ्रेंड्स पेज पर रीडायरेक्ट करेगा
      window.location.href = 'friends.html';
    });
 
    // Energy Regeneration Loop (1 energy per second)
-   // REMOVED: Server handles energy regen via scheduled functions or on-read calculation.
-
-   // --- SAVE COST: PERIODIC FIREBASE UPDATE ---
-   // REMOVED: Client should NEVER write score directly.
+   setInterval(() => {
+       if (energy < MAX_ENERGY) {
+           energy += 1;
+           updateEnergyUI(energy);
+           
+           // Optional: Save energy periodically to avoid too many writes
+           // But for simplicity in Free plan, we can sync less often or just rely on local state
+           if (userRef && energy % 5 === 0) { // Save every 5 energy gained
+               userRef.update({ energy: energy });
+           }
+       }
+   }, 1000);
 
  </script>
  </body>
