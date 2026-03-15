@@ -241,6 +241,19 @@
      transition: width 0.2s linear;
    }
 
+   /* Legal Link Style */
+   .legal-link {
+     position: absolute;
+     bottom: 5px;
+     left: 50%;
+     transform: translateX(-50%);
+     color: rgba(255, 255, 255, 0.5);
+     font-size: 11px;
+     text-decoration: none;
+     z-index: 101;
+   }
+   .legal-link:hover { color: #FFD700; }
+
  </style>
  </head>
  <body>
@@ -283,6 +296,9 @@
        <div class="energy-fill" id="energy-bar-fill"></div>
      </div>
    </div>
+
+   <!-- Legal / Info Link -->
+   <a href="legal.html" class="legal-link">Terms & Info</a>
 
  </div>
  
