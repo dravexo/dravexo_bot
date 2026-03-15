@@ -5,9 +5,12 @@ const cors = require("cors"); // Import the cors package
 admin.initializeApp();
 const db = admin.database();
 
-// Configure CORS to ONLY allow requests from your local development server.
-// For production, you might want to restrict this further or allow your deployed web app's URL.
-const corsHandler = cors({ origin: true }); // 'true' allows all origins (easiest for testing) or use "https://dravexo.github.io"
+// Configure CORS to ONLY allow requests from your deployed web app.
+const corsOptions = {
+  origin: 'https://dravexo.github.io',
+};
+
+const corsHandler = cors(corsOptions);
 
 // --- RATE LIMITING & BOT DETECTION CONFIG ---
 const RATE_LIMITS = {
