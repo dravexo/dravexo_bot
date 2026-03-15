@@ -7,6 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="favicon.png">
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
@@ -259,6 +261,16 @@
                 const data = snapshot.val() || {};
                 
                 if (data) {
+                    // 12-Hour Cycle Logic
+                    const now = new Date();
+                    const cycleId = `${now.toDateString()}-${now.getHours() < 12 ? 'AM' : 'PM'}`;
+                    
+                    // If stored cycle is different, treat list as empty (Visual Reset)
+                    let claimedList = data.claimedChallenges || [];
+                    if (data.lastChallengeCycle !== cycleId) {
+                        claimedList = [];
+                    }
+
                     challengeList.innerHTML = '';
                     challenges.forEach(challenge => {
                         let progress = 0;
@@ -266,7 +278,7 @@
                         if (challenge.type === 'ads') progress = data.totalAdsWatched || 0;
 
                         const isCompleted = progress >= challenge.target;
-                        const isClaimed = (data.claimedChallenges || []).includes(challenge.id);
+                        const isClaimed = claimedList.includes(challenge.id);
 
                         const card = document.createElement('div');
                         card.className = 'challenge-card';
@@ -308,9 +320,26 @@
                 const userRef = db.ref(`users/${currentUser.uid}`);
                 await userRef.transaction(userData => {
                     if(!userData) return;
+                    
+                    // 12-Hour Cycle Logic
+                    const now = new Date();
+                    const cycleId = `${now.toDateString()}-${now.getHours() < 12 ? 'AM' : 'PM'}`;
+
+                    // Reset claims if new cycle
+                    if (userData.lastChallengeCycle !== cycleId) {
+                        userData.claimedChallenges = [];
+                        userData.lastChallengeCycle = cycleId;
+                    }
+
+                    // Add reward
                     userData.score = (userData.score || 0) + reward;
                     if(!userData.claimedChallenges) userData.claimedChallenges = [];
-                    userData.claimedChallenges.push(id);
+                    
+                    // Prevent double claim
+                    if (!userData.claimedChallenges.includes(id)) {
+                        userData.claimedChallenges.push(id);
+                    }
+                    
                     return userData;
                 });
                 

@@ -7,12 +7,14 @@
  <link rel="preconnect" href="https://fonts.googleapis.com">
  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+ <!-- Favicon -->
+ <link rel="icon" type="image/png" href="favicon.png">
  <!-- Firebase SDKs (Add these) -->
  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
  <style>
-   /* सुनिश्चित करें कि html और body पूरी ऊंचाई लें */
+   /* Ensure html and body take full height */
    html, body {
      height: 100%;
      margin: 0;
@@ -20,37 +22,56 @@
    }
  
    .background-container {
-     /* आपकी इमेज का पाथ यहाँ डालें */
-     position: relative; /* चाइल्ड एलिमेंट्स की पोजीशनिंग के लिए */
+     /* Insert your image path here */
+     position: relative; /* For positioning child elements */
      background-image: url('background.png');
  
-     /* पूरी ऊंचाई और चौड़ाई सुनिश्चित करें */
+     /* Ensure full height and width */
      height: 100%;
      width: 100%;
  
-     /* यह इमेज को पूरी तरह से कवर करने के लिए स्केल करता है */
+     /* Scales the image to cover fully */
      background-size: cover;
  
-     /* यह इमेज को कंटेनर में केंद्रित करता है */
+     /* Centers the image in the container */
      background-position: center;
  
-     /* इमेज को दोहराने से रोकता है */
+     /* Prevents image repetition */
      background-repeat: no-repeat;
    }
  
-   /* कंटेंट के लिए स्टाइल (वैकल्पिक) */
+   /* Style for content (Optional) */
    .content {
      color: white;
      text-align: center;
      padding-top: 50px;
    }
 
+   /* Game Logo Style */
+   .game-logo {
+     position: absolute;
+     top: 5px; /* Positioned at the very top */
+     left: 50%;
+     transform: translateX(-50%);
+     width: 100px; /* Made smaller */
+     z-index: 5;
+     filter: drop-shadow(0 5px 15px rgba(0,0,0,0.5));
+     opacity: 0; /* Start invisible for animation */
+     animation: fadeInLogo 1.5s ease-out 0.5s forwards; /* name duration timing-function delay fill-mode */
+   }
+
+   @keyframes fadeInLogo {
+     to {
+       opacity: 1;
+     }
+   }
+
    .tap-image {
-     margin-top: 300px; /* ऊपर से जगह बढ़ाई गई */
-     transition: transform 0.1s ease; /* क्लिक पर एनिमेशन के लिए */
-     cursor: pointer; /* कर्सर को पॉइंटर में बदलता है */
-     max-width: 400px; /* इमेज की अधिकतम चौड़ाई और बढ़ाई गई */
-     width: 90%; /* कंटेनर के हिसाब से चौड़ाई और बढ़ाई गई */
+     margin-top: 300px; /* Increased top margin */
+     transition: transform 0.1s ease; /* For click animation */
+     cursor: pointer; /* Changes cursor to pointer */
+     max-width: 400px; /* Increased max width */
+     width: 90%; /* Increased width relative to container */
    }
 
    .share-button {
@@ -82,58 +103,63 @@
 
    .side-image {
      position: absolute;
-     top: 90px; /* ऊपर से जगह */
-     max-width: 140px; /* अधिकतम चौड़ाई बढ़ाई गई */
+     top: 90px; /* Top spacing */
+     max-width: 140px; /* Increased max width */
      cursor: pointer;
-     transition: transform 0.1s ease-in-out; /* क्लिक पर एनिमेशन के लिए */
+     transition: transform 0.1s ease-in-out; /* For click animation */
    }
 
    .side-image:active {
-     transform: scale(0.95); /* क्लिक पर थोड़ा छोटा होने का प्रभाव */
+     transform: scale(0.95); /* Shrink effect on click */
    }
 
    .daily-bonus-image {
-     left: 20px; /* बाईं ओर */
-     top: 110px; /* ऊपर से जगह बढ़ाई गई */
+     left: 20px; /* Left side */
+     top: 110px; /* Increased top spacing */
    }
 
    .spin-image {
      left: 20px;
-     top: 220px; /* डेली बोनस के नीचे */
+     top: 220px; /* Below daily bonus */
    }
 
    .special-offer-image {
-     right: 20px; /* दाईं ओर */
+     right: 20px; /* Right side */
    }
 
    .challenges-image {
      right: 20px;
-     top: 220px; /* स्पेशल ऑफर के नीचे */
+     top: 220px; /* Below special offer */
+   }
+
+   .leaderboard-image {
+     right: 20px;
+     top: 330px; /* Below challenges */
    }
 
    .coin-counter {
      position: absolute;
      top: 25px;
-     left: 20px; /* साइड में शिफ्ट किया गया */
+     left: 20px; /* Shifted to side */
      transform: none;
-     background: rgba(20, 20, 20, 0.85); /* डार्क ट्रांसपेरेंट बैकग्राउंड */
+     background: rgba(20, 20, 20, 0.85); /* Dark transparent background */
      backdrop-filter: blur(8px);
      color: #ffffff;
      padding: 8px 15px;
      border-radius: 15px;
      display: flex;
      align-items: center;
-     border: 1px solid rgba(255, 215, 0, 0.3); /* हल्का गोल्ड बॉर्डर */
+     border: 1px solid rgba(255, 215, 0, 0.3); /* Light gold border */
      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
      z-index: 100;
      min-width: 120px;
-     cursor: pointer; /* क्लिक करने योग्य बनाने के लिए */
+     cursor: pointer; /* To make it clickable */
      transition: transform 0.2s ease;
-     text-decoration: none; /* लिंक के अंडरलाइन को हटाने के लिए */
+     text-decoration: none; /* Remove link underline */
    }
 
    .coin-counter:active {
-     transform: scale(0.97); /* क्लिक पर फीडबैक */
+     transform: scale(0.97); /* Click feedback */
    }
 
    .wallet-icon {
@@ -220,6 +246,9 @@
  <body>
  
  <div class="background-container">
+   <!-- Main Game Logo -->
+   <img src="logo.png" alt="Dravexo Logo" class="game-logo">
+
    <button class="share-button">Share</button>
    <a href="wallet.html" class="coin-counter">
      <img src="https://img.icons8.com/fluency/48/wallet.png" alt="Wallet" class="wallet-icon">
@@ -240,6 +269,9 @@
    <a href="challenges.html">
      <img src="challenges.png" alt="Challenges" class="side-image challenges-image">
    </a>
+   <a href="rank.html">
+     <img src="leaderboard.jpeg" alt="Leaderboard" class="side-image leaderboard-image">
+   </a>
 
    <div class="content">
      <img src="tap-to-earn.png" alt="Tap to Earn" class="tap-image" id="tap-to-earn-btn">
@@ -255,7 +287,7 @@
  </div>
  
  <script>
-   // बटन एलिमेंट्स को चुनना
+   // Selecting button elements
    const tapToEarnButton = document.getElementById('tap-to-earn-btn');
    const coinCountDisplay = document.getElementById('coin-count');
    const shareButton = document.querySelector('.share-button'); // This is now the Refer & Earn button
@@ -263,7 +295,7 @@
    const energyBarFill = document.getElementById('energy-bar-fill');
    
    // --- FIREBASE CONFIGURATION (START) ---
-   // आपको Firebase Console से अपनी सेटिंग्स यहाँ पेस्ट करनी होंगी
+   // You need to paste your settings from Firebase Console here
    const firebaseConfig = {
        apiKey: "AIzaSyARA7kKshwUYXrN5iiLkmA-WsF0Re14YVA",
        authDomain: "dravexobot.firebaseapp.com",
@@ -281,6 +313,7 @@
    let userRef;
    let score = 0;
    let energy = 500;
+   let unsavedTaps = 0; // To batch tap updates
 
    try {
        firebase.initializeApp(firebaseConfig);
@@ -302,11 +335,13 @@
                            window.location.reload(); 
                            return;
                        }
-                       // Server is the source of truth.
-                       score = data.score || 0;
+                       // Only take server score if we have no local changes
+                       if (unsavedTaps === 0) {
+                           score = data.score || 0;
+                           coinCountDisplay.textContent = score.toLocaleString();
+                       }
                        energy = data.energy !== undefined ? data.energy : MAX_ENERGY;
                        
-                       coinCountDisplay.textContent = score;
                        updateEnergyUI(energy);
 
                        // --- SECURE REFERRAL LOGIC (CLIENT-SIDE) ---
@@ -367,7 +402,7 @@
                    } 
                });
            } else {
-               // अगर लॉग इन नहीं है, तो Anonymous (गुमनाम) लॉग इन करें
+               // If not logged in, sign in anonymously
                auth.signInAnonymously().catch(console.error);
            }
        });
@@ -384,7 +419,7 @@
      energyBarFill.style.width = `${(energy / MAX_ENERGY) * 100}%`;
    }
 
-   // टैप टू अर्न बटन पर क्लिक इवेंट
+   // Click event on Tap to Earn button
    tapToEarnButton.addEventListener('click', (e) => {
      const user = firebase.auth().currentUser;
      if (!user || !userRef) return;
@@ -394,19 +429,13 @@
          // 1. Update Local Variables
          energy -= 1;
          score += 5; // Tap Reward
+         unsavedTaps += 1;
 
          // 2. Update UI Immediately
-         coinCountDisplay.textContent = score;
+         coinCountDisplay.textContent = score.toLocaleString();
          updateEnergyUI(energy);
          showFloatingText(e, 5);
          animateTapButton();
-
-         // 3. Save to Firebase (Direct Write)
-         userRef.update({
-             score: score,
-             energy: energy,
-             totalTaps: firebase.database.ServerValue.increment(1)
-         }).catch(err => console.error("Save failed", err));
      }
    });
 
@@ -427,7 +456,26 @@
      }, 100);
    }
 
-   // शेयर बटन पर क्लिक इवेंट
+   // --- AUTO SAVE SYSTEM (every 15 seconds) ---
+   setInterval(() => {
+       if (!userRef) return;
+
+       // Prepare updates
+       const updates = {
+           score: score,
+           energy: energy
+       };
+
+       if (unsavedTaps > 0) {
+           updates.totalTaps = firebase.database.ServerValue.increment(unsavedTaps);
+       }
+
+       // Send updates to Firebase
+       userRef.update(updates).catch(err => console.error("Auto-save failed", err));
+       unsavedTaps = 0; // Reset counter after sending
+   }, 15000); // 15000ms = 15 Seconds
+
+   // Click event on Share button
    shareButton.addEventListener('click', () => {
      window.location.href = 'friends.html';
    });
@@ -437,12 +485,6 @@
        if (energy < MAX_ENERGY) {
            energy += 1;
            updateEnergyUI(energy);
-           
-           // Optional: Save energy periodically to avoid too many writes
-           // But for simplicity in Free plan, we can sync less often or just rely on local state
-           if (userRef && energy % 5 === 0) { // Save every 5 energy gained
-               userRef.update({ energy: energy });
-           }
        }
    }, 1000);
 

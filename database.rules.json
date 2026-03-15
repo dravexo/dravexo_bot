@@ -2,8 +2,8 @@
   "rules": {
     "users": {
       ".indexOn": ["score"],
+      ".read": true,
       "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid"
       }
     },
@@ -11,7 +11,6 @@
       "$referrerId": {
         ".read": "auth != null && auth.uid === $referrerId",
         "$newUserId": {
-          
            ".write": "auth != null && auth.uid === $newUserId",
            ".validate": "newData.exists()"
         }

@@ -7,6 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="favicon.png">
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
@@ -51,7 +53,7 @@
 
         .usd-balance {
             font-size: 1em;
-            color: #ccc;
+            color: #00e676; /* A vibrant green for a positive message */
             margin-bottom: 20px;
             font-weight: 600;
         }
@@ -140,6 +142,41 @@
         
         .transaction-item .amount { color: #28a745; font-weight: bold; }
         .transaction-item .amount.sent { color: #dc3545; }
+
+        /* Name Section Styles */
+        .name-section {
+            margin-top: 25px;
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        .name-section h3 {
+            font-size: 1.2em;
+            color: #ddd;
+            margin-bottom: 10px;
+        }
+        .name-input-container {
+            display: flex;
+            gap: 10px;
+        }
+        #name-input {
+            flex-grow: 1;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 10px;
+            color: white;
+            font-family: 'Poppins', sans-serif;
+            font-size: 1em;
+        }
+        #save-name-btn {
+            background: #0088cc;
+            border: none;
+            border-radius: 8px;
+            padding: 0 20px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
 
         .back-button {
             margin-top: 20px;
@@ -261,6 +298,20 @@
             margin: 20px auto;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .modal-btn {
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            color: #000;
+            font-weight: 800;
+            font-size: 1.1em;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 165, 0, 0.4);
+            transition: transform 0.2s;
+            margin-top: 15px;
+        }
     </style>
 </head>
 <body>
@@ -277,8 +328,17 @@
                     <img src="https://img.icons8.com/color/48/ton-coin.png" width="14" height="14"> TON Network
                 </div>
                 <h2 id="wallet-balance">0</h2>
-                <p class="usd-balance" id="usd-balance">≈ $0.00 USD</p>
+                <p class="usd-balance" id="usd-balance">Once the token launches, these coins will be exchanged for real tokens!</p>
             </div>
+            
+            <div class="name-section">
+                <h3>Your Leaderboard Name</h3>
+                <div class="name-input-container">
+                    <input type="text" id="name-input" placeholder="Enter your name...">
+                    <button id="save-name-btn">Save</button>
+                </div>
+            </div>
+
             <div class="actions">
                 <button class="action-btn" id="withdraw-btn">
                     <span class="icon">⬆️</span>
@@ -335,6 +395,18 @@
         </div>
     </div>
 
+    <!-- Generic Info Modal -->
+    <div id="infoModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="info-close-btn">&times;</span>
+            <img id="info-modal-icon" src="https://img.icons8.com/3d-fluency/94/confetti.png" alt="Icon" style="width: 80px; margin-bottom: 10px;">
+            <h2 id="info-modal-title">Success</h2>
+            <p id="info-modal-message">Your name has been saved.</p>
+            <button class="modal-btn" id="info-ok-btn">OK</button>
+        </div>
+    </div>
+
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
              // --- FIREBASE CONFIG ---
@@ -356,9 +428,11 @@
             const walletBalance = document.getElementById('wallet-balance');
             const usdBalance = document.getElementById('usd-balance');
             const connectBtn = document.getElementById('connect-wallet-btn');
+            const nameInput = document.getElementById('name-input');
+            const saveNameBtn = document.getElementById('save-name-btn');
             
             // Modal Elements
-            const walletModal = document.getElementById('walletModal');
+            const walletModal = document.getElementById('walletModal'); // Connect wallet modal
             const closeModal = document.querySelector('.close-button');
             const walletList = document.getElementById('wallet-list');
             const walletLoading = document.getElementById('wallet-loading');
@@ -370,20 +444,43 @@
             const launchModal = document.getElementById('launchModal');
             const closeLaunchModal = document.getElementById('close-launch-modal');
             const actionButtons = document.querySelectorAll('.action-btn');
+
+            // Info Modal Elements
+            const infoModal = document.getElementById('infoModal');
+            const infoModalTitle = document.getElementById('info-modal-title');
+            const infoModalMessage = document.getElementById('info-modal-message');
+            const infoOkBtn = document.getElementById('info-ok-btn');
+            const infoCloseBtn = document.getElementById('info-close-btn');
             
             // Constants
             const BASE_TOKEN_PRICE = 0.00001; // 100,000 coins = $1
             
             function updateBalanceUI(balance) {
                 walletBalance.textContent = balance.toLocaleString();
-                const usdValue = (balance * BASE_TOKEN_PRICE).toFixed(2);
-                usdBalance.textContent = `≈ $${usdValue} USD`;
+                // The USD balance text is now static in HTML
             }
 
             auth.onAuthStateChanged(user => {
                 if(user) {
-                    db.ref('users/' + user.uid + '/score').on('value', snap => {
-                        updateBalanceUI(snap.val() || 0);
+                    const userRef = db.ref('users/' + user.uid);
+                    
+                    // Listen for all user data
+                    userRef.on('value', snap => {
+                        const data = snap.val() || {};
+                        updateBalanceUI(data.score || 0);
+                        nameInput.value = data.name || '';
+                    });
+
+                    // Save Name Logic
+                    saveNameBtn.addEventListener('click', () => {
+                        const newName = nameInput.value.trim();
+                        if (newName && newName.length > 2) {
+                            userRef.update({ name: newName }).then(() => {
+                                showInfoPopup('Success!', 'Your name has been saved successfully.');
+                            }).catch(err => showInfoPopup('Error', err.message, false));
+                        } else {
+                            showInfoPopup('Invalid Name', 'Please enter a valid name (at least 3 characters).', false);
+                        }
                     });
                 }
             });
@@ -427,12 +524,19 @@
                 launchModal.style.display = 'none';
             });
 
+            // Info Modal Close Events
+            infoOkBtn.addEventListener('click', () => infoModal.style.display = 'none');
+            infoCloseBtn.addEventListener('click', () => infoModal.style.display = 'none');
+
             window.addEventListener('click', (e) => {
                 if (e.target == walletModal) {
                     walletModal.style.display = 'none';
                 }
                 if (e.target == launchModal) {
                     launchModal.style.display = 'none';
+                }
+                if (e.target == infoModal) {
+                    infoModal.style.display = 'none';
                 }
             });
 
@@ -465,6 +569,13 @@
                     launchModal.style.display = 'block';
                 });
             });
+
+            // --- Helper Functions ---
+            function showInfoPopup(title, message, isSuccess = true) {
+                infoModalTitle.textContent = title;
+                infoModalMessage.textContent = message;
+                infoModal.style.display = 'block';
+            }
 
             // --- Load Real Transactions ---
             function loadTransactions() {

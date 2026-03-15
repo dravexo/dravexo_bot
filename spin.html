@@ -7,6 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="favicon.png">
     <!-- Adsgram Script -->
     <script src="https://adsgram.ai/js/adsgram.js"></script>
     <!-- Firebase SDKs -->
@@ -230,7 +232,6 @@
         </div>
 
         <button class="spin-btn" id="spin-btn">SPIN</button>
-        <p class="cost-text">Cost: 100 Energy</p>
         
         <div class="actions-container">
             <p id="spins-left-text">Spins Left: 3</p>
@@ -289,6 +290,7 @@
         // --- Firebase Initialize ---
         let auth;
         let db;
+        let userRef; // Global reference for listener
         try {
             firebase.initializeApp(firebaseConfig);
             auth = firebase.auth();
@@ -297,7 +299,8 @@
             auth.onAuthStateChanged((user) => {
                 if (user) {
                     // User is signed in. Enable the spin button.
-                    spinBtn.disabled = false;
+                    // spinBtn.disabled = false; // Handled by updateSpinUI now
+                    setupRealtimeListener(user.uid);
                 } else {
                     // User is not signed in. Try to sign in anonymously.
                     auth.signInAnonymously().catch(error => {
@@ -312,6 +315,50 @@
         }
 
         let isSpinning = false;
+        const DAILY_FREE_SPINS = 3;
+        let spinsToday = 0;
+        let extraSpins = 0;
+        const watchAdBtn = document.getElementById('watch-ad-btn');
+
+        // --- Realtime Listener & Logic ---
+        function setupRealtimeListener(userId) {
+            userRef = db.ref('users/' + userId);
+            
+            userRef.on('value', (snapshot) => {
+                const data = snapshot.val() || {};
+                
+                // 12-Hour Cycle Logic
+                const now = new Date();
+                const cycleId = `${now.toDateString()}-${now.getHours() < 12 ? 'AM' : 'PM'}`;
+
+                // Check if it's a new cycle (AM or PM)
+                if (data.lastSpinCycle !== cycleId) {
+                    spinsToday = 0; // Reset for new cycle
+                } else {
+                    spinsToday = data.spinsToday || 0;
+                }
+                
+                extraSpins = data.extraSpins || 0;
+
+                // Calculate total available spins
+                // (5 Free - Used) + Extra from Ads
+                const freeSpinsLeft = Math.max(0, DAILY_FREE_SPINS - spinsToday);
+                const totalSpinsLeft = freeSpinsLeft + extraSpins;
+
+                // Update UI
+                const spinsLeftText = document.getElementById('spins-left-text');
+                spinsLeftText.textContent = `Spins Left: ${totalSpinsLeft}`;
+
+                if (totalSpinsLeft > 0) {
+                    if (!isSpinning) spinBtn.disabled = false;
+                    watchAdBtn.style.display = 'none';
+                } else {
+                    spinBtn.disabled = true;
+                    watchAdBtn.style.display = 'inline-block';
+                    watchAdBtn.textContent = "Watch Ad for +1 Spin";
+                }
+            });
+        }
 
         // --- Modal Functions ---
         function closeModal() {
@@ -345,19 +392,12 @@
             spinBtn.disabled = true;
             spinBtn.textContent = "Spinning...";
 
-            const userId = user.uid;
-            const userRef = db.ref('users/' + userId);
-            const SPIN_COST = 100;
+            // userRef is already defined globally
 
             try {
                 // 1. Check Energy Locally/Direct DB
                 const snapshot = await userRef.once('value');
                 const userData = snapshot.val();
-                const currentEnergy = userData.energy || 0;
-
-                if (currentEnergy < SPIN_COST) {
-                    throw new Error("Not enough energy (Need 100)");
-                }
 
                 // 2. Determine Prize Locally
                 const rewards = [
@@ -369,9 +409,30 @@
                 const winningReward = rewards[winningSegmentIndex].value;
 
                 // 3. Update DB Direct
+                // Handle Spin Counts
+                let newSpinsToday = spinsToday;
+                let newExtraSpins = extraSpins;
+                
+                // 12-Hour Cycle Logic for Update
+                const now = new Date();
+                const cycleId = `${now.toDateString()}-${now.getHours() < 12 ? 'AM' : 'PM'}`;
+
+                if (userData.lastSpinCycle !== cycleId) {
+                    newSpinsToday = 0; // Reset if DB was stale (New Cycle)
+                }
+
+                // Logic: Consume Free spins first, then Extra spins
+                if (newSpinsToday < DAILY_FREE_SPINS) {
+                    newSpinsToday++;
+                } else if (newExtraSpins > 0) {
+                    newExtraSpins--;
+                }
+
                 await userRef.update({
-                    energy: currentEnergy - SPIN_COST,
-                    score: (userData.score || 0) + winningReward
+                    score: (userData.score || 0) + winningReward,
+                    spinsToday: newSpinsToday,
+                    extraSpins: newExtraSpins,
+                    lastSpinCycle: cycleId // Save the cycle ID instead of just Date
                 });
 
                 // 4. Animate
@@ -400,6 +461,36 @@
             spinBtn.disabled = false; // Re-enable the button
             spinBtn.textContent = "SPIN";
         }
+
+        // --- Watch Ad Handler ---
+        // Adsgram Config - Insert real Block ID here
+        // const AdController = window.Adsgram.init({ blockId: "YOUR_BLOCK_ID" });
+        const AdController = { show: () => new Promise((resolve) => { setTimeout(resolve, 2000); }) };
+
+        watchAdBtn.addEventListener('click', async () => {
+            if (!auth.currentUser) return;
+            
+            watchAdBtn.disabled = true;
+            watchAdBtn.textContent = "Loading Ad...";
+
+            try {
+                await AdController.show();
+                
+                // Reward: Add 1 Extra Spin
+                await userRef.update({
+                    extraSpins: firebase.database.ServerValue.increment(1)
+                });
+
+                showInfoPopup("Success!", "You got 1 extra spin!");
+
+            } catch (error) {
+                console.error(error);
+                alert("Ad failed or skipped.");
+            } finally {
+                watchAdBtn.disabled = false;
+                watchAdBtn.textContent = "Watch Ad for +1 Spin";
+            }
+        });
 
         window.addEventListener('load', () => {
             // Initially disable the button until Firebase auth is confirmed

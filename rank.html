@@ -7,6 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="favicon.png">
     <style>
         html, body { height: 100%; margin: 0; font-family: 'Poppins', sans-serif; color: white; }
         
@@ -63,6 +65,7 @@
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script>
          // --- FIREBASE CONFIG ---
         const firebaseConfig = {
@@ -77,10 +80,12 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        const auth = firebase.auth();
 
         const leaderboardList = document.getElementById('leaderboard-list');
         
         async function generateLeaderboard() {
+            if (!auth.currentUser) return;
             leaderboardList.innerHTML = '<p style="color:white;">Loading Top Players...</p>';
             
             try {
@@ -90,12 +95,20 @@
                 
                 const players = [];
                 snapshot.forEach(child => {
-                    players.unshift({ name: "User", score: child.val().score });
+                    const data = child.val();
+                    if (data && data.score !== undefined) {
+                        let displayName = data.name || `Player ${child.key.substr(-4).toUpperCase()}`;
+                        players.unshift({ name: displayName, score: data.score });
+                    }
                 });
                 renderList(players);
             } catch (e) {
                 console.error(e);
-                leaderboardList.innerHTML = '<p style="color:red;">Network Error.</p>';
+                if (e.code === 'PERMISSION_DENIED') {
+                    leaderboardList.innerHTML = '<p style="color:red; font-size: 0.9em;">Error: Permission Denied.<br>Please deploy database rules.</p>';
+                } else {
+                    leaderboardList.innerHTML = '<p style="color:red;">Network Error.</p>';
+                }
             }
         }
         
@@ -131,7 +144,13 @@
             });
         }
 
-        window.onload = generateLeaderboard;
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                generateLeaderboard();
+            } else {
+                auth.signInAnonymously();
+            }
+        });
     </script>
 </body>
 </html>

@@ -7,6 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="favicon.png">
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
@@ -290,7 +292,7 @@
             claimButton.textContent = text;
         }
 
-        // यह फंक्शन तय करता है कि वर्तमान स्ट्रीक और बोनस क्या है
+        // This function determines what the current streak and bonus are
         async function checkBonusStatus() {
             if (!currentUser) return;
             updateButtonState(true, "Loading...");
@@ -324,6 +326,10 @@
         // Function to render the days UI
         function renderDays(streakDay, isClaimable) {
             daysContainer.innerHTML = '';
+            
+            // Handle cycling (keep visuals within 1-30 days range)
+            const cycleDay = ((streakDay - 1) % DAILY_BONUSES.length) + 1;
+
             DAILY_BONUSES.forEach((bonus, index) => {
                 const day = index + 1;
                 const dayElement = document.createElement('div');
@@ -332,18 +338,18 @@
                 let dayLabel = `Day ${day}`;
                 let bonusLabel = day === DAILY_BONUSES.length ? '???' : bonus;
 
-                if (day < streakDay) {
-                    // Already claimed in this streak
+                if (day < cycleDay) {
+                    // Already claimed in this cycle
                     dayElement.classList.add('claimed');
                     bonusLabel = '✓';
-                } else if (day === streakDay) {
+                } else if (day === cycleDay) {
                     if (isClaimable) {
                         // Today's bonus, ready to claim
                         dayElement.classList.add('current');
                     } else {
-                        // Today's bonus, already claimed, on cooldown
-                        dayElement.classList.add('claimed');
-                        bonusLabel = '✓';
+                        // Waiting for cooldown (Next target)
+                        // Do NOT mark as claimed
+                        // Default style shows pending amount
                     }
                 }
 
