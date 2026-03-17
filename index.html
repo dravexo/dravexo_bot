@@ -330,6 +330,7 @@
    let score = 0;
    let energy = 500;
    let unsavedTaps = 0; // To batch tap updates
+   let initialDataLoaded = false; // Flag to prevent race condition on save
 
    try {
        firebase.initializeApp(firebaseConfig);
@@ -381,6 +382,9 @@
                                 window.history.replaceState({}, document.title, window.location.pathname);
                            }
                        }
+                   } else {
+                       // This is a new user, data is "loaded"
+                       initialDataLoaded = true;
                    } 
                });
            } else {
@@ -441,7 +445,7 @@
    // --- AUTO SAVE SYSTEM (every 15 seconds) ---
    // 1. Save function
    function saveProgress() {
-       if (!userRef) return;
+       if (!userRef || !initialDataLoaded) return; // Do not save until initial data is loaded
 
        // Prepare updates if we have unsaved taps
        const updates = {
