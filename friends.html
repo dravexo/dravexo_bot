@@ -310,6 +310,7 @@
 
         let currentUser = null;
         let myReferralCode = ""; // Store code here
+        let myUserId = ""; // Store user ID here
 
         auth.onAuthStateChanged(user => {
             if(user) {
@@ -380,29 +381,34 @@
             
             if (!currentUser) return;
 
+            // This logic is now client-side and less secure, but free.
             submitRefBtn.disabled = true;
             submitRefBtn.textContent = "Checking...";
 
             try {
-                const idToken = await currentUser.getIdToken();
-                // Call the existing server function
-                const response = await fetch('https://us-central1-dravexobot.cloudfunctions.net/submitReferralCode', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${idToken}`
-                    },
-                    body: JSON.stringify({ referralCode: code })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    alert("Success! " + result.message);
-                    manualRefInput.value = '';
-                } else {
-                    alert(result.message); // e.g. "Code not found" or "Already used"
+                // Simulate server logic on the client
+                const referrerId = code; // Assume the code is the user ID
+                if (referrerId === myUserId) {
+                    alert("You cannot use your own code.");
+                    return;
                 }
+
+                const userRef = db.ref(`users/${myUserId}`);
+                const snap = await userRef.once('value');
+                if (snap.val() && snap.val().referredBy) {
+                    alert("You have already used a referral code.");
+                    return;
+                }
+
+                // Give bonus to referrer
+                await db.ref(`users/${referrerId}`).transaction(data => {
+                    if(data) data.score = (data.score || 0) + 5000;
+                    return data;
+                });
+                // Give bonus to self
+                await userRef.update({ referredBy: referrerId, score: (snap.val().score || 0) + 2500 });
+                alert("Success! Referral code applied. You got 2,500 coins.");
+
             } catch (e) {
                 console.error(e);
                 alert("Network error. Please try again.");
@@ -429,27 +435,9 @@
             if (!currentUser) return;
             
             try {
-                // Get the user's ID token for authenticated requests
-                const idToken = await currentUser.getIdToken();
-
-                // Call the getReferralCode cloud function to get the unique code
-                const functionUrl = 'https://us-central1-dravexobot.cloudfunctions.net/getReferralCode';
-                const response = await fetch(functionUrl, {
-                    method: 'POST', // Using POST to send auth header
-                    headers: {
-                        'Authorization': `Bearer ${idToken}`
-                    }
-                });
-                const result = await response.json();
-
-                if (result.success && result.code) {
-                    // Construct the full referral link with the secure code
-                    myReferralCode = result.code; // Save to variable
-                    refLinkEl.textContent = `https://dravexo.github.io/dravexo_bot/index.html?ref=${result.code}`;
-                } else {
-                    refLinkEl.textContent = 'Error loading your code.';
-                    console.error('Could not get referral code:', result.message);
-                }
+                myUserId = currentUser.uid;
+                myReferralCode = myUserId; // Use UID as the referral code
+                refLinkEl.textContent = `https://dravexo.github.io/dravexo_bot/index.html?ref=${myUserId}`;
                 
                 // Fetch user stats (referral count, earnings, etc.)
                 const snap = await db.ref(`users/${currentUser.uid}`).once('value');
@@ -463,7 +451,7 @@
                 updateUI();
 
             } catch(e) {
-                console.error("Error fetching referral data", e);
+                console.error("Error fetching referral data (client-side)", e);
                 refLinkEl.textContent = 'Error loading your code.';
             }
         }
