@@ -146,6 +146,51 @@
             text-transform: uppercase;
             outline: none;
         }
+
+        /* Modal Styles */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 100; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            background-color: rgba(0,0,0,0.8); 
+            backdrop-filter: blur(5px);
+        }
+        .modal-content {
+            background: linear-gradient(135deg, #1a252f, #2c3e50);
+            margin: 40% auto;
+            padding: 30px;
+            border: 2px solid #FFD700;
+            border-radius: 15px;
+            width: 80%;
+            max-width: 350px;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+        }
+        .close-button {
+            color: #aaa;
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .code-display {
+            background: rgba(0,0,0,0.5);
+            border: 2px dashed #FFD700;
+            padding: 15px;
+            font-size: 2em;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin: 20px 0;
+            color: #fff;
+            border-radius: 10px;
+        }
     </style>
 </head>
 <body>
@@ -158,6 +203,7 @@
             <div class="referral-link-container">
                 <span class="referral-link" id="ref-link"></span>
                 <button class="copy-btn" id="share-btn">Share</button>
+                <button class="copy-btn" id="show-code-btn" style="background: linear-gradient(45deg, #FFD700, #FFA500); color: black; margin-left: 5px;">My Code</button>
             </div>
         </div>
 
@@ -217,6 +263,17 @@
         <a href="index.html" class="back-button">Back to Game</a>
     </div>
 
+    <!-- My Code Modal -->
+    <div id="codeModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-code-modal">&times;</span>
+            <h2>Your Referral Code</h2>
+            <p>Share this code with friends so they can enter it manually!</p>
+            <div class="code-display" id="my-code-display">...</div>
+            <button class="copy-btn" id="copy-code-btn" style="width: 100%;">Copy Code</button>
+        </div>
+    </div>
+
     <script>
         const refLinkEl = document.getElementById('ref-link');
         const shareBtn = document.getElementById('share-btn');
@@ -229,6 +286,12 @@
         const milestonesListEl = document.getElementById('milestones-list');
         const friendsBoostStat = document.getElementById('friends-boost-stat');
         const newRegenRate = document.getElementById('new-regen-rate');
+        
+        const codeModal = document.getElementById('codeModal');
+        const showCodeBtn = document.getElementById('show-code-btn');
+        const closeCodeModal = document.getElementById('close-code-modal');
+        const myCodeDisplay = document.getElementById('my-code-display');
+        const copyCodeBtn = document.getElementById('copy-code-btn');
 
         // --- FIREBASE SETUP ---
         const firebaseConfig = {
@@ -246,6 +309,8 @@
         const db = firebase.database();
 
         let currentUser = null;
+        let myReferralCode = ""; // Store code here
+
         auth.onAuthStateChanged(user => {
             if(user) {
                 currentUser = user;
@@ -274,6 +339,34 @@
                 // Fallback to Telegram share link
                 const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(shareText)}`;
                 window.open(telegramUrl, '_blank');
+            }
+        });
+
+        // --- SHOW CODE POPUP LOGIC ---
+        showCodeBtn.addEventListener('click', () => {
+            if (myReferralCode) {
+                myCodeDisplay.textContent = myReferralCode;
+                codeModal.style.display = 'block';
+            } else {
+                alert("Code loading... please wait.");
+            }
+        });
+
+        closeCodeModal.addEventListener('click', () => {
+            codeModal.style.display = 'none';
+        });
+
+        window.addEventListener('click', (event) => {
+            if (event.target == codeModal) {
+                codeModal.style.display = 'none';
+            }
+        });
+
+        copyCodeBtn.addEventListener('click', () => {
+            if (myReferralCode) {
+                navigator.clipboard.writeText(myReferralCode);
+                copyCodeBtn.textContent = "Copied!";
+                setTimeout(() => copyCodeBtn.textContent = "Copy Code", 2000);
             }
         });
 
@@ -351,6 +444,7 @@
 
                 if (result.success && result.code) {
                     // Construct the full referral link with the secure code
+                    myReferralCode = result.code; // Save to variable
                     refLinkEl.textContent = `https://dravexo.github.io/dravexo_bot/index.html?ref=${result.code}`;
                 } else {
                     refLinkEl.textContent = 'Error loading your code.';
