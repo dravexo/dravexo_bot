@@ -360,61 +360,38 @@
                        
                        updateEnergyUI(energy);
 
-                       // --- SECURE REFERRAL LOGIC (CLIENT-SIDE) ---
+                       // --- NEW SECURE REFERRAL LOGIC (SERVER-SIDE) ---
                        // Check if this is a new user and if they came from a referral link
-                       if (!data.score && !data.referredBy) { // New user check
+                       if (!data.referredBy) { // Only check if user has not been referred yet
                            const urlParams = new URLSearchParams(window.location.search);
-                           const referrerId = urlParams.get('start');
+                           const referralCode = urlParams.get('ref'); // We now use 'ref' for the code
 
-                           if (referrerId && referrerId !== userId) {
-                               console.log(`Applying referral from: ${referrerId}`);
-                               
-                               // 1. Give bonus to ME (New User)
-                               userRef.update({
-                                   score: (score || 0) + 5000, // New user bonus
-                                   referredBy: referrerId
-                               });
-                               
-                               // 2. Create a pending referral for the REFERRER
-                               // We write to pendingReferrals/{referrerId}/{myId}
-                               const pendingRef = db.ref(`pendingReferrals/${referrerId}/${userId}`);
-                               pendingRef.set({
-                                   timestamp: firebase.database.ServerValue.TIMESTAMP
-                               }).catch(e => console.error("Could not send referral", e));
-
-                               alert("Welcome! You've received a 5,000 coin bonus for using a referral link!");
-                               
-                               try {
-                                 window.history.replaceState({}, document.title, window.location.pathname);
-                               } catch(e) {}
+                           if (referralCode) {
+                               const user = firebase.auth().currentUser;
+                               if (user) {
+                                   user.getIdToken().then(idToken => {
+                                       const functionUrl = 'https://us-central1-dravexobot.cloudfunctions.net/submitReferralCode';
+                                       fetch(functionUrl, {
+                                           method: 'POST',
+                                           headers: {
+                                               'Content-Type': 'application/json',
+                                               'Authorization': `Bearer ${idToken}`
+                                           },
+                                           body: JSON.stringify({ referralCode: referralCode })
+                                       })
+                                       .then(response => response.json())
+                                       .then(result => {
+                                           if (result.success) {
+                                               alert(result.message); // e.g., "Referral code applied! You got 2500 coins."
+                                               window.history.replaceState({}, document.title, window.location.pathname);
+                                           } else {
+                                               console.warn("Referral code submission failed:", result.message);
+                                           }
+                                       }).catch(error => console.error("Error submitting referral code:", error));
+                                   });
+                               }
                            }
                        }
-
-                       // 2. I AM THE REFERRER (Check if I have new referrals)
-                       // Check pendingReferrals/{myId}
-                       const myPendingRefs = db.ref(`pendingReferrals/${userId}`);
-                       myPendingRefs.once('value', (snapshot) => {
-                           if (snapshot.exists()) {
-                               const referrals = snapshot.val();
-                               const count = Object.keys(referrals).length;
-                               const rewardPerReferral = 25000;
-                               const totalBonus = count * rewardPerReferral;
-                               
-                               // Claim bonuses
-                               const updates = {};
-                               updates['score'] = (score || 0) + totalBonus;
-                               updates['referralCount'] = (data.referralCount || 0) + count;
-                               updates['referralEarnings'] = (data.referralEarnings || 0) + totalBonus;
-                               
-                               userRef.update(updates).then(() => {
-                                   // Delete processed referrals so we don't count them again
-                                   myPendingRefs.remove();
-                                   alert(`You earned ${totalBonus.toLocaleString()} coins from ${count} new referrals!`);
-                               });
-                           }
-                       });
-                       // --- END OF REFERRAL LOGIC ---
-
                    } 
                });
            } else {
@@ -473,10 +450,11 @@
    }
 
    // --- AUTO SAVE SYSTEM (every 15 seconds) ---
-   setInterval(() => {
+   // 1. Save function
+   function saveProgress() {
        if (!userRef) return;
 
-       // Prepare updates
+       // Prepare updates if we have unsaved taps
        const updates = {
            score: score,
            energy: energy
@@ -487,9 +465,23 @@
        }
 
        // Send updates to Firebase
-       userRef.update(updates).catch(err => console.error("Auto-save failed", err));
-       unsavedTaps = 0; // Reset counter after sending
-   }, 15000); // 15000ms = 15 Seconds
+       userRef.update(updates).then(() => {
+           unsavedTaps = 0; // Reset counter ONLY after successful save
+       }).catch(err => console.error("Auto-save failed", err));
+   }
+
+   // 2. Auto-save every 3 seconds (Much faster)
+   setInterval(saveProgress, 5000); // Changed to 5 seconds as requested
+
+   // 3. Save immediately when user leaves the game or switches tabs
+   window.addEventListener('visibilitychange', () => {
+       if (document.visibilityState === 'hidden') {
+           saveProgress();
+       }
+   });
+
+   // Backup for closing the tab
+   window.addEventListener('pagehide', saveProgress);
 
    // Click event on Share button
    shareButton.addEventListener('click', () => {

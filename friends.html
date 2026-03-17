@@ -128,6 +128,24 @@
             cursor: not-allowed;
         }
 
+        /* New Input Styles for Manual Code */
+        .referral-input-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        #manual-ref-code {
+            flex-grow: 1;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #FFD700;
+            border-radius: 8px;
+            padding: 10px;
+            color: white;
+            font-family: 'Poppins', sans-serif;
+            font-size: 1em;
+            text-transform: uppercase;
+            outline: none;
+        }
     </style>
 </head>
 <body>
@@ -140,6 +158,16 @@
             <div class="referral-link-container">
                 <span class="referral-link" id="ref-link"></span>
                 <button class="copy-btn" id="share-btn">Share</button>
+            </div>
+        </div>
+
+        <!-- New Manual Code Entry Section -->
+        <div class="card">
+            <h2>Enter Referral Code</h2>
+            <p>Received a code from a friend? Enter it below to claim your <b>2,500 coin bonus!</b></p>
+            <div class="referral-input-container">
+                <input type="text" id="manual-ref-code" placeholder="ENTER CODE (e.g. A1B2C3)">
+                <button class="copy-btn" id="submit-ref-btn">Submit</button>
             </div>
         </div>
 
@@ -192,6 +220,8 @@
     <script>
         const refLinkEl = document.getElementById('ref-link');
         const shareBtn = document.getElementById('share-btn');
+        const submitRefBtn = document.getElementById('submit-ref-btn');
+        const manualRefInput = document.getElementById('manual-ref-code');
         const friendListEl = document.getElementById('friend-list');
         const friendCountEl = document.getElementById('friend-count');
         const friendsInvitedStat = document.getElementById('friends-invited-stat');
@@ -247,6 +277,48 @@
             }
         });
 
+        // --- MANUAL CODE SUBMISSION LOGIC ---
+        submitRefBtn.addEventListener('click', async () => {
+            const code = manualRefInput.value.trim();
+            if (!code) {
+                alert("Please enter a code.");
+                return;
+            }
+            
+            if (!currentUser) return;
+
+            submitRefBtn.disabled = true;
+            submitRefBtn.textContent = "Checking...";
+
+            try {
+                const idToken = await currentUser.getIdToken();
+                // Call the existing server function
+                const response = await fetch('https://us-central1-dravexobot.cloudfunctions.net/submitReferralCode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`
+                    },
+                    body: JSON.stringify({ referralCode: code })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert("Success! " + result.message);
+                    manualRefInput.value = '';
+                } else {
+                    alert(result.message); // e.g. "Code not found" or "Already used"
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Network error. Please try again.");
+            } finally {
+                submitRefBtn.disabled = false;
+                submitRefBtn.textContent = "Submit";
+            }
+        });
+
         // --- Simulate and load friends ---
         // In a real app, you'd get this from your server
         let invitedCount = 0;
@@ -261,22 +333,44 @@
         ];
 
         async function loadServerData() {
-            if(!currentUser) return;
+            if (!currentUser) return;
             
             try {
-                // Fetch referral code and stats in parallel
-                // Use UID as code for free version
-                refLinkEl.textContent = `https://dravexo.github.io/dravexo_bot/index.html?start=${currentUser.uid}`;
+                // Get the user's ID token for authenticated requests
+                const idToken = await currentUser.getIdToken();
+
+                // Call the getReferralCode cloud function to get the unique code
+                const functionUrl = 'https://us-central1-dravexobot.cloudfunctions.net/getReferralCode';
+                const response = await fetch(functionUrl, {
+                    method: 'POST', // Using POST to send auth header
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`
+                    }
+                });
+                const result = await response.json();
+
+                if (result.success && result.code) {
+                    // Construct the full referral link with the secure code
+                    refLinkEl.textContent = `https://dravexo.github.io/dravexo_bot/index.html?ref=${result.code}`;
+                } else {
+                    refLinkEl.textContent = 'Error loading your code.';
+                    console.error('Could not get referral code:', result.message);
+                }
                 
-                // Fetch basic stats directly
+                // Fetch user stats (referral count, earnings, etc.)
                 const snap = await db.ref(`users/${currentUser.uid}`).once('value');
                 const data = snap.val() || {};
                 invitedCount = data.referralCount || 0;
                 claimedMilestones = data.claimedMilestones || [];
+                
+                // Update the total bonus earned stat from server data
+                bonusEarnedStat.textContent = (data.referralEarnings || 0).toLocaleString();
+
                 updateUI();
 
             } catch(e) {
                 console.error("Error fetching referral data", e);
+                refLinkEl.textContent = 'Error loading your code.';
             }
         }
 
