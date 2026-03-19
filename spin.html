@@ -442,10 +442,9 @@
             try {
                 await AdController.show();
                 
-                // Reward: Add 1 Extra Spin
-                await userRef.update({
-                    extraSpins: firebase.database.ServerValue.increment(1)
-                });
+                // Reward: Call secure function
+                const grantExtraSpin = functions.httpsCallable('grantExtraSpin');
+                await grantExtraSpin();
 
                 showInfoPopup("Success!", "You got 1 extra spin!");
 

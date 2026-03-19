@@ -1,27 +1,27 @@
 {
   "rules": {
     "users": {
+      ".read": "auth != null", 
+      ".indexOn": ["score", "referralCount"],
       "$uid": {
-        
         ".read": "$uid === auth.uid",
-        ".write": "$uid === auth.uid",
         
-        
+        ".write": "$uid === auth.uid && newData.hasChildren(['name']) && !newData.hasChildren(['score', 'energy', 'balance', 'referralCount', 'extraSpins', 'spinsToday', 'lastSpinCycle', 'bonusStreak'])",
+
+        "name": {
+           ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 20"
+        },
         "score": {
-          ".validate": "newData.isNumber() && newData.val() >= data.val() && (newData.val() - data.val() < 1000)"
+          ".write": false 
         },
         "energy": {
-          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500"
+          ".write": false
         },
-         
         "referredBy": {
-          ".validate": "newData.isString() && !data.exists()"
+          ".write": false
         },
-        
         "transactions": {
-          "$txId": {
-            ".validate": "newData.hasChildren(['type', 'amount', 'date']) && newData.child('type').isString() && newData.child('amount').isNumber() && newData.child('date').isNumber()"
-          }
+          ".write": false
         }
       }
     }

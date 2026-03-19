@@ -574,24 +574,18 @@
                     e.target.textContent = "Processing...";
                     
                     try {
-                        const userRef = db.ref(`users/${currentUser.uid}`);
-                        await userRef.transaction(userData => {
-                            if (!userData) return;
-                            // Add reward and mark as claimed
-                            userData.score = (userData.score || 0) + reward;
-                            if (!userData.claimedMilestones) userData.claimedMilestones = [];
-                            userData.claimedMilestones.push(milestoneId);
-                            // Update total referral earnings
-                            userData.referralEarnings = (userData.referralEarnings || 0) + reward;
-                            return userData;
-                        });
+                        // Call Secure Cloud Function
+                        const claimMilestone = functions.httpsCallable('claimMilestone');
+                        await claimMilestone({ milestoneId: milestoneId });
 
                         alert(`You claimed ${reward.toLocaleString()} Dravexo!`);
                         loadServerData(); // Refresh UI
 
                     } catch(err) {
                         console.error(err);
-                        alert("Network error.");
+                        alert("Error: " + err.message);
+                        e.target.textContent = "Claim"; // Reset button if failed
+                        e.target.disabled = false;
                     }
                 });
             });

@@ -239,6 +239,7 @@
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.database();
+        const functions = firebase.functions();
 
         let currentUser = null;
         auth.onAuthStateChanged(user => {
@@ -338,14 +339,11 @@
                 // 1. Show the ad
                 await AdController.show();
 
-                // 2. Claim Reward Locally & Update DB
-                const reward = Math.floor(Math.random() * (1000 - 100 + 1)) + 100;
+                // 2. Call Secure Cloud Function
+                const claimAdReward = functions.httpsCallable('claimAdReward');
+                const result = await claimAdReward();
                 
-                const userRef = db.ref(`users/${currentUser.uid}`);
-                await userRef.transaction(data => {
-                     if(data) data.score = (data.score || 0) + reward;
-                     return data;
-                });
+                const reward = result.data.reward;
 
                 showRewardPopup(reward);
                 
