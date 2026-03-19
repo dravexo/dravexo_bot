@@ -372,8 +372,8 @@
         });
 
         shareBtn.addEventListener('click', async () => {
-            const referralLink = refLinkEl.textContent;
             const shareText = `🔥 Yo! I'm mining Dravexo coins! Join with my link to get a FREE 5,000 coin bonus, and I'll get one too! 🚀 Let's get rich together! 💰`;
+            const referralLink = `https://dravexo.github.io/dravexo_bot/index.html?ref=${myUserId}`;
 
             if (navigator.share) {
                 // Use Web Share API if available
@@ -542,7 +542,7 @@
             try {
                 myUserId = currentUser.uid;
                 myReferralCode = myUserId; // Use UID as the referral code
-                refLinkEl.textContent = `https://dravexo.github.io/dravexo_bot/index.html?ref=${myUserId}`;
+                refLinkEl.textContent = "Click 'Share' to get your link!";
                 
                 // Fetch user stats (referral count, earnings, etc.)
                 const snap = await db.ref(`users/${currentUser.uid}`).once('value');

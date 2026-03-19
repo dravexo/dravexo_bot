@@ -384,8 +384,9 @@
                        }
                    } else {
                        // This is a new user, data is "loaded"
-                       initialDataLoaded = true;
-                   } 
+                   }
+                   // After the first snapshot is processed, we can consider the initial data loaded.
+                   initialDataLoaded = true;
                });
            } else {
                // If not logged in, sign in anonymously
