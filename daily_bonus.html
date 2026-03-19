@@ -375,11 +375,23 @@
             updateButtonState(true, "Claiming...");
             
             try {
-                // Call Secure Cloud Function
-                const claimDailyBonus = functions.httpsCallable('claimDailyBonus');
-                const result = await claimDailyBonus();
+                // --- CLIENT SIDE LOGIC (Free Plan) ---
+                const streak = bonusState.currentStreak;
+                const reward = DAILY_BONUSES[(streak - 1) % DAILY_BONUSES.length];
+
+                const userRef = db.child(`users/${currentUser.uid}`);
+                await userRef.update({
+                    score: firebase.database.ServerValue.increment(reward),
+                    lastBonusClaim: Date.now(),
+                    bonusStreak: streak
+                });
                 
-                const { reward, streak } = result.data;
+                // Log transaction
+                await userRef.child('transactions').push().set({
+                    type: 'Daily Bonus',
+                    amount: reward,
+                    date: Date.now()
+                });
 
                 modalMessage.innerHTML = `You claimed <b>${reward}</b> Coins!`;
                 bonusModal.style.display = 'block';

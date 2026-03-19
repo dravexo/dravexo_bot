@@ -465,9 +465,30 @@
             submitRefBtn.textContent = "Checking...";
 
             try {
-                // Call Secure Cloud Function
-                const claimReferral = functions.httpsCallable('claimReferral');
-                await claimReferral({ code: code });
+                // --- CLIENT SIDE LOGIC (Free Plan) ---
+                const referrerId = code;
+                if (referrerId === currentUser.uid) throw new Error("Cannot refer yourself.");
+
+                const referrerRef = db.ref(`users/${referrerId}`);
+                const referrerSnap = await referrerRef.once('value');
+                if (!referrerSnap.exists()) throw new Error("Invalid referral code.");
+
+                const userRef = db.ref(`users/${currentUser.uid}`);
+                const userSnap = await userRef.once('value');
+                if (userSnap.val().referredBy) throw new Error("Already referred.");
+
+                // Bonus for Referrer
+                await referrerRef.update({
+                    score: firebase.database.ServerValue.increment(2500),
+                    referralCount: firebase.database.ServerValue.increment(1),
+                    referralEarnings: firebase.database.ServerValue.increment(2500)
+                });
+
+                // Bonus for Self
+                await userRef.update({
+                    referredBy: referrerId,
+                    score: firebase.database.ServerValue.increment(2500)
+                });
 
                 showInfoPopup('Success!', 'Referral code applied. You got 2,500 coins!', 'success');
                 manualRefInput.value = ''; // Clear input on success
@@ -500,7 +521,7 @@
             try {
                 myUserId = currentUser.uid;
                 myReferralCode = myUserId; // Use UID as the referral code
-                refLinkEl.textContent = "Click 'Share' to get your link!";
+                refLinkEl.textContent = `https://dravexo.github.io/dravexo_bot/index.html?ref=${myUserId}`;
                 
                 // Fetch user stats (referral count, earnings, etc.)
                 const snap = await db.ref(`users/${currentUser.uid}`).once('value');

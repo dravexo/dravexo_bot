@@ -396,13 +396,40 @@
             spinBtn.textContent = "Spinning...";
 
             try {
-                // Call the secure cloud function
-                const spinTheWheel = functions.httpsCallable('spinTheWheel');
-                const result = await spinTheWheel();
+                // --- CLIENT SIDE LOGIC (Free Plan) ---
+                const rewards = [
+                    { value: 500, label: "500" },
+                    { value: 1000, label: "1K" },
+                    { value: 2000, label: "2K" },
+                    { value: 100, label: "100" },
+                    { value: 5000, label: "5K" },
+                    { value: 50000, label: "JACKPOT" }
+                ];
+                const winningSegmentIndex = Math.floor(Math.random() * rewards.length);
+                const winningReward = rewards[winningSegmentIndex];
 
-                // Get results from the server
-                const { winningReward, winningSegmentIndex } = result.data;
+                // Update DB locally
+                let newSpinsToday = spinsToday;
+                let newExtraSpins = extraSpins;
+                const freeSpinsLeft = Math.max(0, DAILY_FREE_SPINS - spinsToday);
 
+                if (freeSpinsLeft > 0) {
+                    newSpinsToday++;
+                } else {
+                    newExtraSpins--;
+                }
+
+                // 12-Hour Cycle Logic needs to be passed too
+                const now = new Date();
+                const cycleId = `${now.toDateString()}-${now.getHours() < 12 ? 'AM' : 'PM'}`;
+
+                await userRef.update({
+                    score: (await userRef.child('score').once('value')).val() + winningReward.value,
+                    spinsToday: newSpinsToday,
+                    extraSpins: newExtraSpins,
+                    lastSpinCycle: cycleId
+                });
+                
                 // Animate the wheel to the server-determined result
                 const segmentAngle = 60;
                 const randomAngleInSegment = Math.random() * (segmentAngle - 10) + 5;
@@ -442,9 +469,8 @@
             try {
                 await AdController.show();
                 
-                // Reward: Call secure function
-                const grantExtraSpin = functions.httpsCallable('grantExtraSpin');
-                await grantExtraSpin();
+                // Reward: Update DB locally
+                await userRef.child('extraSpins').set(firebase.database.ServerValue.increment(1));
 
                 showInfoPopup("Success!", "You got 1 extra spin!");
 

@@ -6,22 +6,10 @@
       "$uid": {
         ".read": "$uid === auth.uid",
         
-        ".write": "$uid === auth.uid && newData.hasChildren(['name']) && !newData.hasChildren(['score', 'energy', 'balance', 'referralCount', 'extraSpins', 'spinsToday', 'lastSpinCycle', 'bonusStreak'])",
+        ".write": "$uid === auth.uid",
 
         "name": {
            ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 20"
-        },
-        "score": {
-          ".write": false 
-        },
-        "energy": {
-          ".write": false
-        },
-        "referredBy": {
-          ".write": false
-        },
-        "transactions": {
-          ".write": false
         }
       }
     }

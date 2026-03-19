@@ -339,11 +339,13 @@
                 // 1. Show the ad
                 await AdController.show();
 
-                // 2. Call Secure Cloud Function
-                const claimAdReward = functions.httpsCallable('claimAdReward');
-                const result = await claimAdReward();
+                // 2. CLIENT SIDE REWARD (Free Plan)
+                const reward = Math.floor(Math.random() * (1000 - 100 + 1)) + 100;
                 
-                const reward = result.data.reward;
+                const userRef = db.ref(`users/${currentUser.uid}`);
+                await userRef.update({
+                    score: firebase.database.ServerValue.increment(reward)
+                });
 
                 showRewardPopup(reward);
                 

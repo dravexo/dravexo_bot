@@ -494,15 +494,17 @@
        unsavedTaps = 0; // Reset immediately to prevent double send
 
        try {
-           // Call Secure Cloud Function
-           const processTaps = firebase.functions().httpsCallable('processTaps');
-           await processTaps({
-               taps: tapsToSend,
-               energySpent: energyUsed
+           // Save directly to Firebase (Free Plan Method)
+           await userRef.update({
+               score: score,
+               energy: energy,
+               totalTaps: firebase.database.ServerValue.increment(tapsToSend)
            });
            // Success: Server and Client are now in sync
        } catch (err) {
-           console.error("Save failed / Cheating detected:", err.message);
+           console.error("Save failed:", err.message);
+           // Restore unsaved taps so user doesn't lose coins on network error
+           unsavedTaps += tapsToSend; 
            // Optional: Reload page if server rejects taps (Anti-Cheat)
            // window.location.reload(); 
        }

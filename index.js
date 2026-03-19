@@ -196,7 +196,7 @@ exports.processTaps = functions.https.onCall(async (data, context) => {
     // Ensure user isn't tapping faster than humanly possible (e.g., > 15 taps/sec)
     const lastActive = userData.lastActive || (now - 10000);
     const timeDiff = now - lastActive;
-    const minTimeRequired = taps * 60; // 60ms per tap minimum
+    const minTimeRequired = taps * 30; // Reduced to 30ms (approx 33 taps/sec) to prevent false positives
     if (timeDiff < minTimeRequired) {
         return { success: false, message: "You are tapping too fast. Slow down!" };
     }
