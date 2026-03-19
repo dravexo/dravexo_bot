@@ -15,6 +15,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
     <style>
         html, body { height: 100%; margin: 0; font-family: 'Poppins', sans-serif; color: white; }
         .background-container {
@@ -290,11 +291,13 @@
         // --- Firebase Initialize ---
         let auth;
         let db;
+        let functions;
         let userRef; // Global reference for listener
         try {
             firebase.initializeApp(firebaseConfig);
             auth = firebase.auth();
             db = firebase.database();
+            functions = firebase.functions();
 
             auth.onAuthStateChanged((user) => {
                 if (user) {
@@ -389,53 +392,18 @@
             }
         
             isSpinning = true;
-            spinBtn.disabled = true;
+            spinBtn.disabled = true; // Double ensure it's disabled
             spinBtn.textContent = "Spinning...";
 
-            // userRef is already defined globally
-
             try {
-                // 1. Check Energy Locally/Direct DB
-                const snapshot = await userRef.once('value');
-                const userData = snapshot.val();
+                // Call the secure cloud function
+                const spinTheWheel = functions.httpsCallable('spinTheWheel');
+                const result = await spinTheWheel();
 
-                // 2. Determine Prize Locally
-                const rewards = [
-                    { value: 500 }, { value: 1000 },
-                    { value: 2000 }, { value: 100 },
-                    { value: 5000 }, { value: 50000 }
-                ];
-                const winningSegmentIndex = Math.floor(Math.random() * rewards.length);
-                const winningReward = rewards[winningSegmentIndex].value;
+                // Get results from the server
+                const { winningReward, winningSegmentIndex } = result.data;
 
-                // 3. Update DB Direct
-                // Handle Spin Counts
-                let newSpinsToday = spinsToday;
-                let newExtraSpins = extraSpins;
-                
-                // 12-Hour Cycle Logic for Update
-                const now = new Date();
-                const cycleId = `${now.toDateString()}-${now.getHours() < 12 ? 'AM' : 'PM'}`;
-
-                if (userData.lastSpinCycle !== cycleId) {
-                    newSpinsToday = 0; // Reset if DB was stale (New Cycle)
-                }
-
-                // Logic: Consume Free spins first, then Extra spins
-                if (newSpinsToday < DAILY_FREE_SPINS) {
-                    newSpinsToday++;
-                } else if (newExtraSpins > 0) {
-                    newExtraSpins--;
-                }
-
-                await userRef.update({
-                    score: (userData.score || 0) + winningReward,
-                    spinsToday: newSpinsToday,
-                    extraSpins: newExtraSpins,
-                    lastSpinCycle: cycleId // Save the cycle ID instead of just Date
-                });
-
-                // 4. Animate
+                // Animate the wheel to the server-determined result
                 const segmentAngle = 60;
                 const randomAngleInSegment = Math.random() * (segmentAngle - 10) + 5;
                 const targetAngle = (winningSegmentIndex * segmentAngle) + randomAngleInSegment;
@@ -445,22 +413,20 @@
                 wheel.style.transform = `rotate(${totalRotation}deg)`;
     
                 setTimeout(() => {
-                    modalMessage.innerHTML = `You won <b>${winningReward.toLocaleString()}</b> Coins!`;
+                    modalMessage.innerHTML = `You won <b>${winningReward.value.toLocaleString()}</b> Coins!`;
                     rewardModal.style.display = 'block';
-                    finishSpin();
+                    isSpinning = false; 
+                    // The UI will update automatically from the realtime listener
                 }, 3000);
 
             } catch (error) {
-                showInfoPopup("Error", error.message);
-                finishSpin();
+                console.error("Spin failed:", error);
+                showInfoPopup("Spin Failed", error.message);
+                isSpinning = false;
+                spinBtn.disabled = false; // Re-enable on failure
+                spinBtn.textContent = "SPIN";
             }
         });
-
-        function finishSpin() {
-            isSpinning = false;
-            spinBtn.disabled = false; // Re-enable the button
-            spinBtn.textContent = "SPIN";
-        }
 
         // --- Watch Ad Handler ---
         // Adsgram Config - Insert real Block ID here

@@ -13,6 +13,7 @@
  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+ <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
  <style>
    /* Ensure html and body take full height */
    html, body {
@@ -254,9 +255,35 @@
    }
    .legal-link:hover { color: #FFD700; }
 
+   /* Loading Screen Styles */
+   #loading-screen {
+     position: fixed;
+     top: 0; left: 0; width: 100%; height: 100%;
+     background: #000;
+     z-index: 9999;
+     display: flex;
+     flex-direction: column;
+     justify-content: center;
+     align-items: center;
+     transition: opacity 0.5s ease;
+   }
+   .loader {
+     border: 5px solid #333;
+     border-top: 5px solid #FFD700;
+     border-radius: 50%;
+     width: 50px; height: 50px;
+     animation: spin 1s linear infinite;
+     margin-bottom: 20px;
+   }
+   @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
  </style>
  </head>
  <body>
+ <!-- Loading Screen -->
+ <div id="loading-screen">
+   <div class="loader"></div>
+   <p style="color: #FFD700; font-weight: bold;">Connecting to Server...</p>
+ </div>
  
  <div class="background-container">
    <!-- Main Game Logo -->
@@ -309,6 +336,7 @@
    const shareButton = document.querySelector('.share-button'); // This is now the Refer & Earn button
    const energyValDisplay = document.getElementById('energy-val');
    const energyBarFill = document.getElementById('energy-bar-fill');
+   const loadingScreen = document.getElementById('loading-screen');
    
    // --- FIREBASE CONFIGURATION (START) ---
    // You need to paste your settings from Firebase Console here
@@ -327,15 +355,18 @@
    // Firebase Initialize
    let db;
    let userRef;
+   let functions;
    let score = 0;
    let energy = 500;
    let unsavedTaps = 0; // To batch tap updates
    let initialDataLoaded = false; // Flag to prevent race condition on save
+   let lastTapTime = 0; // Anti-cheat rate limit
 
    try {
        firebase.initializeApp(firebaseConfig);
        const auth = firebase.auth();
        db = firebase.database();
+       functions = firebase.functions();
        
        auth.onAuthStateChanged((user) => {
            if (user) {
@@ -387,6 +418,10 @@
                    }
                    // After the first snapshot is processed, we can consider the initial data loaded.
                    initialDataLoaded = true;
+                   
+                   // Hide loading screen
+                   loadingScreen.style.opacity = '0';
+                   setTimeout(() => loadingScreen.style.display = 'none', 500);
                });
            } else {
                // If not logged in, sign in anonymously
@@ -410,6 +445,11 @@
    tapToEarnButton.addEventListener('click', (e) => {
      const user = firebase.auth().currentUser;
      if (!user || !userRef) return;
+
+     // Basic Rate Limiting (Anti-Cheat)
+     const now = Date.now();
+     if (now - lastTapTime < 40) return; // Limit to ~25 taps per second (human limit)
+     lastTapTime = now;
 
      // CLIENT SIDE LOGIC (FREE PLAN)
      if (energy >= 1) {
@@ -445,23 +485,27 @@
 
    // --- AUTO SAVE SYSTEM (every 15 seconds) ---
    // 1. Save function
-   function saveProgress() {
+   async function saveProgress() {
        if (!userRef || !initialDataLoaded) return; // Do not save until initial data is loaded
+       if (unsavedTaps === 0) return; // Nothing to save
 
-       // Prepare updates if we have unsaved taps
-       const updates = {
-           score: score,
-           energy: energy
-       };
+       const tapsToSend = unsavedTaps;
+       const energyUsed = tapsToSend; // 1 tap = 1 energy
+       unsavedTaps = 0; // Reset immediately to prevent double send
 
-       if (unsavedTaps > 0) {
-           updates.totalTaps = firebase.database.ServerValue.increment(unsavedTaps);
+       try {
+           // Call Secure Cloud Function
+           const processTaps = firebase.functions().httpsCallable('processTaps');
+           await processTaps({
+               taps: tapsToSend,
+               energySpent: energyUsed
+           });
+           // Success: Server and Client are now in sync
+       } catch (err) {
+           console.error("Save failed / Cheating detected:", err.message);
+           // Optional: Reload page if server rejects taps (Anti-Cheat)
+           // window.location.reload(); 
        }
-
-       // Send updates to Firebase
-       userRef.update(updates).then(() => {
-           unsavedTaps = 0; // Reset counter ONLY after successful save
-       }).catch(err => console.error("Auto-save failed", err));
    }
 
    // 2. Auto-save every 3 seconds (Much faster)

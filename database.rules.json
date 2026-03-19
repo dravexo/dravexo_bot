@@ -1,23 +1,29 @@
 {
   "rules": {
     "users": {
-      ".indexOn": ["score"],
-      ".read": true,
       "$uid": {
-        ".write": "auth != null && auth.uid === $uid"
-      }
-    },
-    "pendingReferrals": {
-      "$referrerId": {
-        ".read": "auth != null && auth.uid === $referrerId",
-        "$newUserId": {
-           ".write": "auth != null && auth.uid === $newUserId",
-           ".validate": "newData.exists()"
+        
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid",
+        
+        
+        "score": {
+          ".validate": "newData.isNumber() && newData.val() >= data.val() && (newData.val() - data.val() < 1000)"
+        },
+        "energy": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500"
+        },
+         
+        "referredBy": {
+          ".validate": "newData.isString() && !data.exists()"
+        },
+        
+        "transactions": {
+          "$txId": {
+            ".validate": "newData.hasChildren(['type', 'amount', 'date']) && newData.child('type').isString() && newData.child('amount').isNumber() && newData.child('date').isNumber()"
+          }
         }
       }
-    },
-    "leaderboard": {
-       ".read": true
     }
   }
 }

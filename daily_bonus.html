@@ -13,6 +13,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
     <style>
         html, body {
             height: 100%;
@@ -253,6 +254,7 @@
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.database().ref();
+        const functions = firebase.functions();
         
         let currentUser = null;
         let bonusState = { canClaim: false, currentStreak: 1 };
@@ -373,32 +375,19 @@
             updateButtonState(true, "Claiming...");
             
             try {
-                const streak = bonusState.currentStreak;
-                let rewardAmount = DAILY_BONUSES[(streak - 1) % DAILY_BONUSES.length];
+                // Call Secure Cloud Function
+                const claimDailyBonus = functions.httpsCallable('claimDailyBonus');
+                const result = await claimDailyBonus();
+                
+                const { reward, streak } = result.data;
 
-                // Update DB Direct
-                const userRef = db.child(`users/${currentUser.uid}`);
-                await userRef.transaction(userData => {
-                    // This is a robust way to handle the transaction.
-                    // If userData is null (e.g., new user), it creates a default object.
-                    // This prevents accidentally resetting the score.
-                    const data = userData || {
-                        score: 0,
-                        bonusStreak: 0
-                    };
-
-                    data.score = (data.score || 0) + rewardAmount;
-                    data.lastBonusClaim = Date.now();
-                    data.bonusStreak = streak;
-                    return data;
-                });
-
-                modalMessage.innerHTML = `You claimed <b>${rewardAmount}</b> Coins!`;
+                modalMessage.innerHTML = `You claimed <b>${reward}</b> Coins!`;
                 bonusModal.style.display = 'block';
                 updateUI();
 
             } catch (e) {
-                alert("Error claiming bonus.");
+                console.error(e);
+                alert("Failed: " + e.message);
                 updateUI();
             }
         });

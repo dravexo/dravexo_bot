@@ -1,4 +1,245 @@
 const functions = require("firebase-functions");
-// This file is intentionally left (almost) empty.
-// All logic has been moved to the client-side to avoid needing the Blaze plan.
-// We keep the file to prevent deployment errors.
+const admin = require("firebase-admin");
+
+admin.initializeApp();
+
+// Define rewards server-side to prevent client manipulation
+const SPIN_REWARDS = [
+    { value: 500, label: "500" },
+    { value: 1000, label: "1K" },
+    { value: 2000, label: "2K" },
+    { value: 100, label: "100" },
+    { value: 5000, label: "5K" },
+    { value: 50000, label: "JACKPOT" } // Jackpot is 50k
+];
+const DAILY_FREE_SPINS = 3;
+const DAILY_BONUSES = [ 500, 1000, 1500, 2000, 2500, 3000, 5000, 3500, 4000, 4500, 5000, 5500, 6000, 10000, 6500, 7000, 7500, 8000, 8500, 9000, 15000, 9500, 10000, 10500, 11000, 11500, 12000, 20000, 30000, 50000 ];
+const TAPS_PER_SAVE = 50; // Client will send batches of 50 taps
+const SCORE_PER_TAP = 5;
+
+/**
+ * Securely processes a spin request from a user.
+ */
+
+exports.spinTheWheel = functions.https.onCall(async (data, context) => {
+    // 1. Check authentication
+    if (!context.auth) {
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "You must be logged in to spin the wheel."
+        );
+    }
+    const uid = context.auth.uid;
+    const userRef = admin.database().ref(`/users/${uid}`);
+
+    let spinsToday = 0;
+    let extraSpins = 0;
+    let currentScore = 0;
+    let lastSpinCycle = "";
+
+    // 2. Get current user state from database
+    const snapshot = await userRef.once("value");
+    const userData = snapshot.val();
+    if (userData) {
+        currentScore = userData.score || 0;
+        extraSpins = userData.extraSpins || 0;
+        lastSpinCycle = userData.lastSpinCycle || "";
+    }
+
+    // 3. Server-side validation of spin availability
+    const now = new Date();
+    const cycleId = `${now.toDateString()}-${now.getHours() < 12 ? 'AM' : 'PM'}`;
+
+    if (lastSpinCycle !== cycleId) {
+        spinsToday = 0; // It's a new cycle, reset spins
+    } else {
+        spinsToday = userData.spinsToday || 0;
+    }
+
+    const freeSpinsLeft = Math.max(0, DAILY_FREE_SPINS - spinsToday);
+    const totalSpinsLeft = freeSpinsLeft + extraSpins;
+
+    if (totalSpinsLeft <= 0) {
+        throw new functions.https.HttpsError(
+            "failed-precondition",
+            "You have no spins left."
+        );
+    }
+
+    // 4. Determine which spin is being consumed and update counts
+    let newSpinsToday = spinsToday;
+    let newExtraSpins = extraSpins;
+    if (freeSpinsLeft > 0) {
+        newSpinsToday++;
+    } else {
+        newExtraSpins--;
+    }
+
+    // 5. Generate reward on the server
+    const winningSegmentIndex = Math.floor(Math.random() * SPIN_REWARDS.length);
+    const winningReward = SPIN_REWARDS[winningSegmentIndex];
+
+    // 6. Atomically update user data in the database
+    await userRef.update({
+        score: currentScore + winningReward.value,
+        spinsToday: newSpinsToday,
+        extraSpins: newExtraSpins,
+        lastSpinCycle: cycleId
+    });
+
+    // 7. Return the result to the client
+    return {
+        winningReward: winningReward,
+        winningSegmentIndex: winningSegmentIndex
+    };
+});
+
+/**
+ * Securely claims the daily bonus for a user.
+ */
+exports.claimDailyBonus = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Authentication required.");
+    }
+
+    const uid = context.auth.uid;
+    const userRef = admin.database().ref(`/users/${uid}`);
+    const now = Date.now();
+    const MS_IN_DAY = 24 * 60 * 60 * 1000;
+
+    const snapshot = await userRef.once("value");
+    const userData = snapshot.val() || {};
+
+    const lastClaim = userData.lastBonusClaim || 0;
+
+    // Server-side time validation
+    if (now - lastClaim < MS_IN_DAY) {
+        throw new functions.https.HttpsError("failed-precondition", "You have already claimed your bonus for today.");
+    }
+
+    // Streak logic
+    let currentStreak = userData.bonusStreak || 0;
+    if (now - lastClaim > (MS_IN_DAY * 2)) {
+        currentStreak = 0; // Streak broken
+    }
+    const newStreak = currentStreak + 1;
+
+    // Determine reward
+    const rewardAmount = DAILY_BONUSES[(newStreak - 1) % DAILY_BONUSES.length];
+
+    // Atomically update user data
+    await userRef.update({
+        score: admin.database.ServerValue.increment(rewardAmount),
+        lastBonusClaim: now,
+        bonusStreak: newStreak
+    });
+
+    // Log the transaction
+    const txRef = userRef.child('transactions').push();
+    await txRef.set({
+        type: 'Daily Bonus',
+        amount: rewardAmount,
+        date: now
+    });
+
+    return { success: true, reward: rewardAmount, streak: newStreak };
+});
+
+/**
+ * Securely processes a batch of taps from the user.
+ */
+exports.processTaps = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Authentication required.");
+    }
+
+    const uid = context.auth.uid;
+    const userRef = admin.database().ref(`/users/${uid}`);
+
+    const taps = parseInt(data.taps, 10);
+    const energySpent = parseInt(data.energySpent, 10);
+
+    // Basic validation
+    if (!taps || taps <= 0 || taps > (TAPS_PER_SAVE + 5)) { // Allow a small buffer
+        throw new functions.https.HttpsError("invalid-argument", "Invalid tap count.");
+    }
+    if (energySpent !== taps) {
+        throw new functions.https.HttpsError("invalid-argument", "Energy and tap mismatch.");
+    }
+
+    const snapshot = await userRef.once("value");
+    const currentEnergy = snapshot.val().energy || 0;
+
+    // Server-side energy check
+    if (currentEnergy < energySpent) {
+        // User might be cheating. We can just ignore the request or penalize.
+        // For now, we'll update their energy to the correct server value and give no score.
+        await userRef.update({ energy: currentEnergy });
+        throw new functions.https.HttpsError("failed-precondition", "Not enough energy.");
+    }
+
+    const scoreGained = taps * SCORE_PER_TAP;
+
+    // Atomically update score and energy
+    await userRef.update({
+        score: admin.database.ServerValue.increment(scoreGained),
+        energy: admin.database.ServerValue.increment(-energySpent),
+        totalTaps: admin.database.ServerValue.increment(taps)
+    });
+
+    return { success: true, scoreAdded: scoreGained };
+});
+
+/**
+ * Securely processes a referral code claim.
+ */
+exports.claimReferral = functions.https.onCall(async (data, context) => {
+    // 1. Auth Check
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Authentication required.");
+    }
+
+    const uid = context.auth.uid;
+    const code = data.code; // The code entered (referrer's UID)
+
+    if (!code || typeof code !== 'string') {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid referral code.");
+    }
+
+    if (code === uid) {
+        throw new functions.https.HttpsError("invalid-argument", "You cannot refer yourself.");
+    }
+
+    const userRef = admin.database().ref(`/users/${uid}`);
+    const referrerRef = admin.database().ref(`/users/${code}`);
+
+    // 2. Verify User Status
+    const userSnap = await userRef.once("value");
+    const userData = userSnap.val() || {};
+
+    if (userData.referredBy) {
+        throw new functions.https.HttpsError("failed-precondition", "You have already been referred.");
+    }
+
+    // 3. Verify Referrer Exists
+    const referrerSnap = await referrerRef.once("value");
+    if (!referrerSnap.exists()) {
+        throw new functions.https.HttpsError("not-found", "Referral code does not exist.");
+    }
+
+    // 4. Atomic Updates (Secure Transaction)
+    // Bonus for New User
+    await userRef.update({
+        referredBy: code,
+        score: admin.database.ServerValue.increment(2500)
+    });
+
+    // Bonus for Referrer
+    await referrerRef.update({
+        score: admin.database.ServerValue.increment(2500),
+        referralCount: admin.database.ServerValue.increment(1),
+        referralEarnings: admin.database.ServerValue.increment(2500)
+    });
+
+    return { success: true, message: "Referral claimed successfully!" };
+});

@@ -13,6 +13,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
     <script src="https://adsgram.ai/js/adsgram.js"></script>
     <style>
         /* Basic styles from other pages */
@@ -357,6 +358,7 @@
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.database();
+        const functions = firebase.functions();
 
         let currentUser = null;
         let myReferralCode = ""; // Store code here
@@ -463,60 +465,16 @@
             submitRefBtn.textContent = "Checking...";
 
             try {
-                const referrerId = code; // Assume the code is the user ID
-                if (referrerId === myUserId) {
-                    showInfoPopup('Oops!', 'You cannot use your own code.', 'error');
-                    return;
-                }
-
-                // Check if referrer exists in the database
-                const referrerRef = db.ref(`users/${referrerId}`);
-                const referrerSnap = await referrerRef.once('value');
-
-                if (!referrerSnap.exists()) {
-                    showInfoPopup('Invalid Code', 'This referral code does not exist.', 'error');
-                    return;
-                }
-
-                const userRef = db.ref(`users/${myUserId}`);
-                const snap = await userRef.once('value');
-                if (snap.val() && snap.val().referredBy) {
-                    showInfoPopup('Already Referred', 'You have already used a referral code.', 'error');
-                    return;
-                }
-
-                // Give bonus to referrer
-                await referrerRef.transaction(data => {
-                    if(data) {
-                        data.score = (data.score || 0) + 2500; // Referrer gets 2500
-                        // Log transaction for referrer
-                        if (!data.transactions) data.transactions = {};
-                        const txId = Date.now().toString();
-                        data.transactions[txId] = {
-                            type: 'Friend Invited',
-                            amount: 2500,
-                            date: Date.now()
-                        };
-                    }
-                    return data;
-                });
-                // Give bonus to self
-                await userRef.update({ referredBy: referrerId, score: (snap.val().score || 0) + 2500 });
-                
-                // Log transaction for self
-                const newTxRef = db.ref(`users/${myUserId}/transactions`).push();
-                await newTxRef.set({
-                    type: 'Referral Bonus',
-                    amount: 2500,
-                    date: firebase.database.ServerValue.TIMESTAMP
-                });
+                // Call Secure Cloud Function
+                const claimReferral = functions.httpsCallable('claimReferral');
+                await claimReferral({ code: code });
 
                 showInfoPopup('Success!', 'Referral code applied. You got 2,500 coins!', 'success');
                 manualRefInput.value = ''; // Clear input on success
 
             } catch (e) {
                 console.error(e);
-                alert("Network error. Please try again.");
+                showInfoPopup('Error', e.message || 'Something went wrong.', 'error');
             } finally {
                 submitRefBtn.disabled = false;
                 submitRefBtn.textContent = "Submit";
