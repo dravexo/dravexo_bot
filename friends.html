@@ -446,23 +446,35 @@
 
         // --- MANUAL CODE SUBMISSION LOGIC ---
         submitRefBtn.addEventListener('click', async () => {
-            const code = manualRefInput.value.trim().toUpperCase();
+            const code = manualRefInput.value.trim(); // Removed toUpperCase to support case-sensitive UIDs
             if (!code) {
                 showInfoPopup('Input Required', 'Please enter a code.', 'error');
                 return;
             }
             
+            if (code.length < 10) {
+                showInfoPopup('Invalid Code', 'Referral code must be at least 10 characters long.', 'error');
+                return;
+            }
+            
             if (!currentUser) return;
 
-            // This logic is now client-side and less secure, but free.
             submitRefBtn.disabled = true;
             submitRefBtn.textContent = "Checking...";
 
             try {
-                // Simulate server logic on the client
                 const referrerId = code; // Assume the code is the user ID
                 if (referrerId === myUserId) {
                     showInfoPopup('Oops!', 'You cannot use your own code.', 'error');
+                    return;
+                }
+
+                // Check if referrer exists in the database
+                const referrerRef = db.ref(`users/${referrerId}`);
+                const referrerSnap = await referrerRef.once('value');
+
+                if (!referrerSnap.exists()) {
+                    showInfoPopup('Invalid Code', 'This referral code does not exist.', 'error');
                     return;
                 }
 
@@ -474,12 +486,31 @@
                 }
 
                 // Give bonus to referrer
-                await db.ref(`users/${referrerId}`).transaction(data => {
-                    if(data) data.score = (data.score || 0) + 2500; // Referrer gets 2500
+                await referrerRef.transaction(data => {
+                    if(data) {
+                        data.score = (data.score || 0) + 2500; // Referrer gets 2500
+                        // Log transaction for referrer
+                        if (!data.transactions) data.transactions = {};
+                        const txId = Date.now().toString();
+                        data.transactions[txId] = {
+                            type: 'Friend Invited',
+                            amount: 2500,
+                            date: Date.now()
+                        };
+                    }
                     return data;
                 });
                 // Give bonus to self
                 await userRef.update({ referredBy: referrerId, score: (snap.val().score || 0) + 2500 });
+                
+                // Log transaction for self
+                const newTxRef = db.ref(`users/${myUserId}/transactions`).push();
+                await newTxRef.set({
+                    type: 'Referral Bonus',
+                    amount: 2500,
+                    date: firebase.database.ServerValue.TIMESTAMP
+                });
+
                 showInfoPopup('Success!', 'Referral code applied. You got 2,500 coins!', 'success');
                 manualRefInput.value = ''; // Clear input on success
 

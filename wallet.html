@@ -469,15 +469,37 @@
                         const data = snap.val() || {};
                         updateBalanceUI(data.score || 0);
                         nameInput.value = data.name || '';
+                        loadTransactions(data.transactions);
                     });
 
                     // Save Name Logic
-                    saveNameBtn.addEventListener('click', () => {
+                    saveNameBtn.addEventListener('click', async () => {
                         const newName = nameInput.value.trim();
-                        if (newName && newName.length > 2) {
-                            userRef.update({ name: newName }).then(() => {
-                                showInfoPopup('Success!', 'Your name has been saved successfully.');
-                            }).catch(err => showInfoPopup('Error', err.message, false));
+                        
+                        if (newName && newName.length >= 3) {
+                            saveNameBtn.disabled = true;
+                            saveNameBtn.textContent = "Checking...";
+
+                            try {
+                                // Check uniqueness on server
+                                const snapshot = await db.ref('users').orderByChild('name').equalTo(newName).once('value');
+                                let isTaken = false;
+                                snapshot.forEach(child => {
+                                    if (child.key !== user.uid) isTaken = true;
+                                });
+
+                                if (isTaken) {
+                                    showInfoPopup('Name Taken', 'This username is already taken. Please choose another.', false);
+                                } else {
+                                    await userRef.update({ name: newName });
+                                    showInfoPopup('Success!', 'Your name has been saved successfully.');
+                                }
+                            } catch(err) {
+                                showInfoPopup('Error', 'Could not verify name: ' + err.message, false);
+                            } finally {
+                                saveNameBtn.disabled = false;
+                                saveNameBtn.textContent = "Save";
+                            }
                         } else {
                             showInfoPopup('Invalid Name', 'Please enter a valid name (at least 3 characters).', false);
                         }
@@ -578,17 +600,19 @@
             }
 
             // --- Load Real Transactions ---
-            function loadTransactions() {
-                const transactions = JSON.parse(localStorage.getItem('transactionHistory')) || [];
+            function loadTransactions(transactionsData) {
+                transactionList.innerHTML = '';
                 
-                if (transactions.length === 0) {
+                if (!transactionsData) {
                     transactionList.innerHTML = '<p style="color: #888; text-align: center; margin-top: 20px;">No recent transactions</p>';
                     return;
                 }
 
-                transactionList.innerHTML = '';
+                // Convert Firebase object to array and sort by date (newest first)
+                const transactions = Object.values(transactionsData).sort((a, b) => b.date - a.date);
+
                 // Show last 10 transactions (newest first)
-                transactions.slice().reverse().slice(0, 10).forEach(tx => {
+                transactions.slice(0, 10).forEach(tx => {
                     const date = new Date(tx.date);
                     const now = new Date();
                     let dateStr;
@@ -613,7 +637,6 @@
                 });
             }
 
-            loadTransactions();
         });
     </script>
 </body>

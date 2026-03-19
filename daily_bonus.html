@@ -379,14 +379,18 @@
                 // Update DB Direct
                 const userRef = db.child(`users/${currentUser.uid}`);
                 await userRef.transaction(userData => {
-                     if(!userData) {
-                         // Initialize user if data doesn't exist yet
-                         userData = { score: 0, energy: 500, maxEnergy: 500 };
-                     }
-                     userData.score = (userData.score || 0) + rewardAmount;
-                     userData.lastBonusClaim = Date.now();
-                     userData.bonusStreak = streak;
-                     return userData;
+                    // This is a robust way to handle the transaction.
+                    // If userData is null (e.g., new user), it creates a default object.
+                    // This prevents accidentally resetting the score.
+                    const data = userData || {
+                        score: 0,
+                        bonusStreak: 0
+                    };
+
+                    data.score = (data.score || 0) + rewardAmount;
+                    data.lastBonusClaim = Date.now();
+                    data.bonusStreak = streak;
+                    return data;
                 });
 
                 modalMessage.innerHTML = `You claimed <b>${rewardAmount}</b> Coins!`;
