@@ -448,7 +448,7 @@
 
      // Basic Rate Limiting (Anti-Cheat)
      const now = Date.now();
-     if (now - lastTapTime < 40) return; // Limit to ~25 taps per second (human limit)
+     if (now - lastTapTime < 60) return; // Increased to 60ms (Strict: ~16 taps/sec max for humans)
      lastTapTime = now;
 
      // CLIENT SIDE LOGIC (FREE PLAN)

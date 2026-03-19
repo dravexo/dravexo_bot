@@ -7,7 +7,20 @@
         ".read": "$uid === auth.uid",
         
         ".write": "$uid === auth.uid",
-
+ 
+        "score": {
+            
+           ".validate": "newData.isNumber() && (newData.val() - data.val() < 1000)"
+        },
+        "totalTaps": {
+           
+           ".validate": "newData.isNumber() && newData.val() >= data.val()"
+        },
+        "energy": {
+           
+           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500"
+        },
+        
         "name": {
            ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 20"
         }

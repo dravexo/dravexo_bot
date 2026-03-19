@@ -595,10 +595,26 @@
                     e.target.textContent = "Processing...";
                     
                     try {
-                        // Call Secure Cloud Function
-                        const claimMilestone = functions.httpsCallable('claimMilestone');
-                        await claimMilestone({ milestoneId: milestoneId });
+                        // --- SECURE CLIENT TRANSACTION ---
+                        const userRef = db.ref(`users/${currentUser.uid}`);
+                        await userRef.transaction(userData => {
+                            if (!userData) return;
+                            const currentInvites = userData.referralCount || 0;
+                            const claimed = userData.claimedMilestones || [];
+                            
+                            // Validation: Check real DB count
+                            if (currentInvites < ms.required) return; // Hack attempt blocked
+                            if (claimed.includes(milestoneId)) return; // Already claimed
 
+                            // Award
+                            userData.score = (userData.score || 0) + reward;
+                            userData.referralEarnings = (userData.referralEarnings || 0) + reward;
+                            if (!userData.claimedMilestones) userData.claimedMilestones = [];
+                            userData.claimedMilestones.push(milestoneId);
+                            
+                            return userData;
+                        });
+                        
                         alert(`You claimed ${reward.toLocaleString()} Dravexo!`);
                         loadServerData(); // Refresh UI
 

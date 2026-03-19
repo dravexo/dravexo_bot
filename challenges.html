@@ -299,7 +299,7 @@
 
                         button.addEventListener('click', () => {
                             if (button.disabled) return;
-                            claimReward(challenge.id, challenge.reward);
+                            claimReward(challenge.id, challenge.reward, challenge.target, challenge.type);
                         });
 
                         challengeList.appendChild(card);
@@ -310,7 +310,7 @@
             }
         }
 
-        async function claimReward(id, reward) {
+        async function claimReward(id, reward, target, type) {
             if (!currentUser) return;
             const button = document.querySelector(`.claim-btn[data-id="${id}"]`);
             button.disabled = true;
@@ -329,6 +329,15 @@
                     if (userData.lastChallengeCycle !== cycleId) {
                         userData.claimedChallenges = [];
                         userData.lastChallengeCycle = cycleId;
+                    }
+
+                    // --- SECURITY CHECK (Verify progress inside DB) ---
+                    let currentProgress = 0;
+                    if (type === 'taps') currentProgress = userData.totalTaps || 0;
+                    if (type === 'ads') currentProgress = userData.totalAdsWatched || 0;
+
+                    if (currentProgress < target) {
+                        return; // Abort: User hasn't reached target yet!
                     }
 
                     // Add reward
