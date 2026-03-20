@@ -377,6 +377,7 @@
    let initialDataLoaded = false; // Flag to prevent race condition on save
    let lastTapTime = 0; // Anti-cheat rate limit
    let regenRate = 1; // Default regeneration rate
+   let isFirstLoad = true; // Flag to show popup only once on connect
 
    try {
        firebase.initializeApp(firebaseConfig);
@@ -440,12 +441,16 @@
                    // After the first snapshot is processed, we can consider the initial data loaded.
                    initialDataLoaded = true;
                    
-                   // Hide loading screen
-                   loadingScreen.style.opacity = '0';
-                   setTimeout(() => loadingScreen.style.display = 'none', 500);
+                   // Show popup only on first server connection
+                   if (isFirstLoad) {
+                       // Hide loading screen
+                       loadingScreen.style.opacity = '0';
+                       setTimeout(() => loadingScreen.style.display = 'none', 500);
 
-                   // Show Beta Warning immediately
-                   betaWarningModal.style.display = 'block';
+                       // Show Beta Warning immediately
+                       betaWarningModal.style.display = 'block';
+                       isFirstLoad = false;
+                   }
                });
            } else {
                // If not logged in, sign in anonymously
