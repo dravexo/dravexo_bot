@@ -245,7 +245,7 @@
             <p>Received a code from a friend? Enter it below to claim your <b>2,500 coin bonus!</b></p>
             <div class="referral-input-container">
                 <input type="text" id="manual-ref-code" placeholder="ENTER CODE (e.g. A1B2C3)">
-                <button class="copy-btn" id="submit-ref-btn">Submit</button>
+                <button class="copy-btn" id="submit-ref-btn" style="background: linear-gradient(45deg, #28a745, #218838);">Claim Bonus</button>
             </div>
         </div>
 
@@ -511,7 +511,7 @@
                 showInfoPopup('Error', e.message || 'Something went wrong.', 'error');
             } finally {
                 submitRefBtn.disabled = false;
-                submitRefBtn.textContent = "Submit";
+                submitRefBtn.textContent = "Claim Bonus";
             }
         });
 
