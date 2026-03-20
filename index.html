@@ -362,6 +362,7 @@
    let unsavedTaps = 0; // To batch tap updates
    let initialDataLoaded = false; // Flag to prevent race condition on save
    let lastTapTime = 0; // Anti-cheat rate limit
+   let regenRate = 1; // Default regeneration rate
 
    try {
        firebase.initializeApp(firebaseConfig);
@@ -391,6 +392,11 @@
                        }
                        energy = data.energy !== undefined ? data.energy : MAX_ENERGY;
                        
+                       // --- Calculate Boost from Referrals ---
+                       const refCount = data.referralCount || 0;
+                       const boostPercent = refCount * 0.05; // 5% per friend
+                       regenRate = 1 * (1 + boostPercent);
+
                        updateEnergyUI(energy);
 
                        // --- CLIENT-SIDE REFERRAL LOGIC (Free plan) ---
@@ -495,26 +501,19 @@
        unsavedTaps = 0; // Reset immediately to prevent double send
 
        try {
-           // Call Secure Cloud Function (Anti-Cheat Active)
-           const processTaps = firebase.functions().httpsCallable('processTaps');
-           const result = await processTaps({
-               taps: tapsToSend,
-               energySpent: energyUsed
+           // --- CLIENT SIDE SAVE (FREE PLAN COMPATIBLE) ---
+           // Direct update to DB (secured by Rules)
+           await userRef.update({
+               score: score,
+               energy: energy,
+               totalTaps: firebase.database.ServerValue.increment(tapsToSend),
+               lastActive: firebase.database.ServerValue.TIMESTAMP
            });
-           
-           if (result.data && !result.data.success) {
-               console.warn("Server Warning:", result.data.message);
-           }
            // Success: Server and Client are now in sync
        } catch (err) {
-           console.error("Anti-Cheat System:", err.message);
-           if (err.message.includes("BANNED") || err.message.includes("banned")) {
-               alert("You have been BANNED for using auto-clickers.");
-               window.location.reload();
-           } else {
-               // Network error or mild warning, restore taps
-               unsavedTaps += tapsToSend; 
-           }
+           console.error("Save failed:", err.message);
+           // Restore taps on error
+           unsavedTaps += tapsToSend; 
        }
    }
 
@@ -539,7 +538,8 @@
    // Energy Regeneration Loop (1 energy per second)
    setInterval(() => {
        if (energy < MAX_ENERGY) {
-           energy += 1;
+           energy += regenRate; // Use dynamic regen rate based on referrals
+           if (energy > MAX_ENERGY) energy = MAX_ENERGY;
            updateEnergyUI(energy);
        }
    }, 1000);

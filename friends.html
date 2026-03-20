@@ -465,33 +465,46 @@
             submitRefBtn.textContent = "Checking...";
 
             try {
-                // --- CLIENT SIDE LOGIC (Free Plan) ---
+                // --- FREE PLAN REFERRAL LOGIC ---
                 const referrerId = code;
                 if (referrerId === currentUser.uid) throw new Error("Cannot refer yourself.");
 
+                // 1. Verify Referrer Exists
                 const referrerRef = db.ref(`users/${referrerId}`);
                 const referrerSnap = await referrerRef.once('value');
                 if (!referrerSnap.exists()) throw new Error("Invalid referral code.");
 
+                // 2. Atomic Transaction on Current User
                 const userRef = db.ref(`users/${currentUser.uid}`);
-                const userSnap = await userRef.once('value');
-                if (userSnap.val().referredBy) throw new Error("Already referred.");
+                const result = await userRef.transaction(userData => {
+                    if (!userData) return userData; // Safety check
+                    if (userData.referredBy) return; // Abort if already referred
 
-                // Bonus for Referrer
-                await referrerRef.update({
-                    score: firebase.database.ServerValue.increment(2500),
-                    referralCount: firebase.database.ServerValue.increment(1),
-                    referralEarnings: firebase.database.ServerValue.increment(2500)
+                    // Apply referral
+                    userData.referredBy = referrerId;
+                    userData.score = (userData.score || 0) + 2500;
+                    // Mark this transaction to allow retry if network fails
+                    userData.lastReferralAttempt = Date.now();
+                    return userData;
                 });
 
-                // Bonus for Self
-                await userRef.update({
-                    referredBy: referrerId,
-                    score: firebase.database.ServerValue.increment(2500)
+                if (!result.committed) {
+                    throw new Error("Already referred or transaction failed.");
+                }
+
+                // 3. Give Bonus to Referrer (Only if Step 2 succeeded)
+                await referrerRef.transaction(refData => {
+                    if (refData) {
+                        refData.score = (refData.score || 0) + 2500;
+                        refData.referralCount = (refData.referralCount || 0) + 1;
+                        refData.referralEarnings = (refData.referralEarnings || 0) + 2500;
+                    }
+                    return refData;
                 });
 
                 showInfoPopup('Success!', 'Referral code applied. You got 2,500 coins!', 'success');
                 manualRefInput.value = ''; // Clear input on success
+                loadServerData(); // Refresh UI immediately
 
             } catch (e) {
                 console.error(e);

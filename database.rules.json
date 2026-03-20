@@ -6,19 +6,21 @@
       "$uid": {
         ".read": "$uid === auth.uid",
         
-        ".write": "$uid === auth.uid",
- 
+        
+        ".write": "($uid === auth.uid && !data.child('isBanned').exists()) || (auth != null && newData.child('referralCount').val() === data.child('referralCount').val() + 1)",
+        
         "score": {
-            
-           ".validate": "newData.isNumber() && (newData.val() - data.val() < 1000)"
+      
+           ".validate": "newData.isNumber() && (newData.val() - data.val() <= 5000)"
         },
         "totalTaps": {
-           
            ".validate": "newData.isNumber() && newData.val() >= data.val()"
         },
         "energy": {
-           
            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500"
+        },
+        "referredBy": {
+           ".validate": "newData.isString() && !data.exists()"
         },
         
         "name": {
