@@ -180,6 +180,11 @@ exports.processTaps = functions.https.onCall(async (data, context) => {
     const snapshot = await userRef.once("value");
     const userData = snapshot.val() || {};
     
+    // --- Anti-Cheat: Ban Check ---
+    if (userData.isBanned) {
+        throw new functions.https.HttpsError("permission-denied", "Your account has been banned due to suspicious activity.");
+    }
+
     // --- Server-Side Energy Regeneration Logic ---
     let storedEnergy = userData.energy !== undefined ? userData.energy : MAX_ENERGY;
     const lastEnergyUpdate = userData.lastEnergyUpdate || Date.now();
@@ -196,9 +201,19 @@ exports.processTaps = functions.https.onCall(async (data, context) => {
     // Ensure user isn't tapping faster than humanly possible (e.g., > 15 taps/sec)
     const lastActive = userData.lastActive || (now - 10000);
     const timeDiff = now - lastActive;
-    const minTimeRequired = taps * 30; // Reduced to 30ms (approx 33 taps/sec) to prevent false positives
+    
+    // Strict Check: 50ms per tap (Max 20 taps/second). Humans rarely sustain > 12 taps/sec.
+    const minTimeRequired = taps * 50; 
+
     if (timeDiff < minTimeRequired) {
-        return { success: false, message: "You are tapping too fast. Slow down!" };
+        // Warning Logic
+        const warnings = (userData.cheatWarnings || 0) + 1;
+        if (warnings >= 3) {
+            await userRef.update({ isBanned: true });
+            throw new functions.https.HttpsError("resource-exhausted", "Account BANNED: Bot activity detected.");
+        }
+        await userRef.update({ cheatWarnings: warnings });
+        return { success: false, message: `Tap speed too high! Warning ${warnings}/3.` };
     }
 
     // Server-side energy check

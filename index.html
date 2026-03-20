@@ -495,19 +495,26 @@
        unsavedTaps = 0; // Reset immediately to prevent double send
 
        try {
-           // Save directly to Firebase (Free Plan Method)
-           await userRef.update({
-               score: score,
-               energy: energy,
-               totalTaps: firebase.database.ServerValue.increment(tapsToSend)
+           // Call Secure Cloud Function (Anti-Cheat Active)
+           const processTaps = firebase.functions().httpsCallable('processTaps');
+           const result = await processTaps({
+               taps: tapsToSend,
+               energySpent: energyUsed
            });
+           
+           if (result.data && !result.data.success) {
+               console.warn("Server Warning:", result.data.message);
+           }
            // Success: Server and Client are now in sync
        } catch (err) {
-           console.error("Save failed:", err.message);
-           // Restore unsaved taps so user doesn't lose coins on network error
-           unsavedTaps += tapsToSend; 
-           // Optional: Reload page if server rejects taps (Anti-Cheat)
-           // window.location.reload(); 
+           console.error("Anti-Cheat System:", err.message);
+           if (err.message.includes("BANNED") || err.message.includes("banned")) {
+               alert("You have been BANNED for using auto-clickers.");
+               window.location.reload();
+           } else {
+               // Network error or mild warning, restore taps
+               unsavedTaps += tapsToSend; 
+           }
        }
    }
 
