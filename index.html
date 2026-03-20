@@ -329,6 +329,20 @@
    <a href="legal.html" class="legal-link">Terms & Info</a>
 
  </div>
+
+ <!-- Beta Warning Modal -->
+ <div id="betaWarningModal" class="modal" style="display: none; z-index: 10000;">
+   <div class="modal-content" style="border: 2px solid #ff4444; max-width: 320px;">
+     <h2 style="color: #ff4444; margin-top: 0;">⚠️ IMPORTANT WARNING</h2>
+     <div style="text-align: left; margin: 20px 10px; font-size: 1.1em; line-height: 1.6;">
+        <p style="margin: 5px 0;">🚧 <strong>Game is in Beta Mode</strong></p>
+        <p style="margin: 5px 0;">🛡️ <strong>Anti-Cheat is ACTIVE</strong></p>
+        <p style="margin: 5px 0; color: #ff6b6b;">🚫 <strong>Suspicious activity = PERMANENT BAN</strong></p>
+     </div>
+     <p style="font-size: 0.85em; color: #aaa; margin-bottom: 15px;">By playing, you agree to our <a href="legal.html" style="color: #FFD700; text-decoration: underline;">Terms & Privacy Policy</a>.</p>
+     <button class="modal-btn" id="beta-ok-btn" style="background: linear-gradient(45deg, #ff4444, #cc0000); color: white; width: 100%;">I Understand</button>
+   </div>
+ </div>
  
  <script>
    // Selecting button elements
@@ -338,6 +352,8 @@
    const energyValDisplay = document.getElementById('energy-val');
    const energyBarFill = document.getElementById('energy-bar-fill');
    const loadingScreen = document.getElementById('loading-screen');
+   const betaWarningModal = document.getElementById('betaWarningModal');
+   const betaOkBtn = document.getElementById('beta-ok-btn');
    
    // --- FIREBASE CONFIGURATION (START) ---
    // You need to paste your settings from Firebase Console here
@@ -429,6 +445,13 @@
                    // Hide loading screen
                    loadingScreen.style.opacity = '0';
                    setTimeout(() => loadingScreen.style.display = 'none', 500);
+
+                   // Show Beta Warning (if not seen in this session)
+                   if (!sessionStorage.getItem('betaWarningSeen')) {
+                       setTimeout(() => {
+                           betaWarningModal.style.display = 'block';
+                       }, 600); // Show shortly after loading screen fades
+                   }
                });
            } else {
                // If not logged in, sign in anonymously
@@ -439,6 +462,12 @@
        console.error("Firebase not connected. Replace config keys.", error);
    }
    // --- FIREBASE CONFIGURATION (END) ---
+
+   // Handle Beta Warning Button
+   betaOkBtn.addEventListener('click', () => {
+       betaWarningModal.style.display = 'none';
+       sessionStorage.setItem('betaWarningSeen', 'true');
+   });
 
    // Energy System
    const MAX_ENERGY = 500;
