@@ -416,6 +416,9 @@
    let lastTapTime = 0; // Anti-cheat rate limit
    let regenRate = 1; // Default regeneration rate
    let isFirstLoad = true; // Flag to show popup only once on connect
+   let lastTapX = 0; // Anti-auto-clicker
+   let lastTapY = 0;
+   let sameSpotCount = 0;
 
    try {
        firebase.initializeApp(firebaseConfig);
@@ -535,10 +538,21 @@
 
      // Basic Rate Limiting (Anti-Cheat)
      const now = Date.now();
-     if (now - lastTapTime < 60) return; // Increased to 60ms (Strict: ~16 taps/sec max for humans)
-     lastTapTime = now;
+     if (now - lastTapTime < 70) return; // ~14 taps/sec max (Human limit)
 
-     // CLIENT SIDE LOGIC (FREE PLAN)
+     // Detect Static Auto-Clickers (Clicking same exact pixel)
+     if (e.pageX === lastTapX && e.pageY === lastTapY) {
+         sameSpotCount++;
+         if (sameSpotCount > 15) return; // Ignore if more than 15 taps on same pixel
+     } else {
+         sameSpotCount = 0;
+     }
+
+     lastTapTime = now;
+     lastTapX = e.pageX;
+     lastTapY = e.pageY;
+
+     // Local visual update for smoothness
      if (energy >= 1) {
          // 1. Update Local Variables
          energy -= 1;
@@ -577,19 +591,21 @@
        if (unsavedTaps === 0) return; // Nothing to save
 
        const tapsToSend = unsavedTaps;
-       const energyUsed = tapsToSend; // 1 tap = 1 energy
        unsavedTaps = 0; // Reset immediately to prevent double send
 
        try {
-           // --- CLIENT SIDE SAVE (FREE PLAN COMPATIBLE) ---
-           // Direct update to DB (secured by Rules)
-           await userRef.update({
-               score: score,
-               energy: energy,
-               totalTaps: firebase.database.ServerValue.increment(tapsToSend),
-               lastActive: firebase.database.ServerValue.TIMESTAMP
+           // --- SECURE SERVER-SIDE SAVE ---
+           const processTaps = firebase.functions().httpsCallable('processTaps');
+           const result = await processTaps({ 
+               taps: tapsToSend, 
+               energySpent: tapsToSend 
            });
-           // Success: Server and Client are now in sync
+
+           if (result.data.success) {
+               console.log("Progress synced with server.");
+           } else if (result.data.message) {
+               alert(result.data.message);
+           }
        } catch (err) {
            console.error("Save failed:", err.message);
            // Restore taps on error

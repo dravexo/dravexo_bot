@@ -170,8 +170,8 @@ exports.processTaps = functions.https.onCall(async (data, context) => {
     const energySpent = parseInt(data.energySpent, 10);
 
     // Basic validation
-    if (!taps || taps <= 0 || taps > (TAPS_PER_SAVE + 5)) { // Allow a small buffer
-        throw new functions.https.HttpsError("invalid-argument", "Invalid tap count.");
+    if (!taps || taps <= 0 || taps > 100) { // Max 100 taps per 5s batch
+        throw new functions.https.HttpsError("invalid-argument", "Suspicious tap volume.");
     }
     if (energySpent !== taps) {
         throw new functions.https.HttpsError("invalid-argument", "Energy and tap mismatch.");
@@ -202,8 +202,8 @@ exports.processTaps = functions.https.onCall(async (data, context) => {
     const lastActive = userData.lastActive || (now - 10000);
     const timeDiff = now - lastActive;
     
-    // Strict Check: 50ms per tap (Max 20 taps/second). Humans rarely sustain > 12 taps/sec.
-    const minTimeRequired = taps * 50; 
+    // Tightened Check: 80ms per tap (Max ~12 taps/second). 
+    const minTimeRequired = taps * 80; 
 
     if (timeDiff < minTimeRequired) {
         // Warning Logic
