@@ -202,18 +202,18 @@ exports.processTaps = functions.https.onCall(async (data, context) => {
     const lastActive = userData.lastActive || (now - 10000);
     const timeDiff = now - lastActive;
     
-    // Tightened Check: 80ms per tap (Max ~12 taps/second). 
-    const minTimeRequired = taps * 80; 
+    // Human Check: 70ms per tap is physically very fast. 
+    const minTimeRequired = taps * 70; 
 
     if (timeDiff < minTimeRequired) {
         // Warning Logic
         const warnings = (userData.cheatWarnings || 0) + 1;
-        if (warnings >= 3) {
+        if (warnings >= 5) { // Increased to 5 warnings before ban
             await userRef.update({ isBanned: true });
             throw new functions.https.HttpsError("resource-exhausted", "Account BANNED: Bot activity detected.");
         }
         await userRef.update({ cheatWarnings: warnings });
-        return { success: false, message: `Tap speed too high! Warning ${warnings}/3.` };
+        return { success: false, message: `Tap speed too high! Warning ${warnings}/5.` };
     }
 
     // Server-side energy check

@@ -413,6 +413,7 @@
    let energy = 500;
    let unsavedTaps = 0; // To batch tap updates
    let initialDataLoaded = false; // Flag to prevent race condition on save
+   let isSyncing = false; // To prevent UI flickering during save
    let lastTapTime = 0; // Anti-cheat rate limit
    let regenRate = 1; // Default regeneration rate
    let isFirstLoad = true; // Flag to show popup only once on connect
@@ -451,8 +452,8 @@
                            window.location.reload(); 
                            return;
                        }
-                       // Only take server score if we have no local changes
-                       if (unsavedTaps === 0) {
+                       // Only take server score if we have no local changes and not currently saving
+                       if (unsavedTaps === 0 && !isSyncing) {
                            score = data.score || 0;
                            coinCountDisplay.textContent = score.toLocaleString();
                        }
@@ -587,8 +588,9 @@
        if (!userRef || !initialDataLoaded) return; // Do not save until initial data is loaded
        if (unsavedTaps === 0) return; // Nothing to save
 
-       const tapsToSend = unsavedTaps;
-       unsavedTaps = 0; // Reset immediately to prevent double send
+       const tapsToSend = Math.min(unsavedTaps, 100); // Cap at 100 to avoid server rejection
+       unsavedTaps -= tapsToSend; // Deduct only what we are sending
+       isSyncing = true;
 
        try {
            // --- SECURE SERVER-SIDE SAVE ---
@@ -600,14 +602,17 @@
 
            if (result.data.success) {
                console.log("Progress synced with server.");
-               // Optional: Re-sync local score with what server confirms if needed
            } else if (result.data.message) {
-               alert(result.data.message);
+               console.warn("Server message:", result.data.message);
+               // Restore taps if server rejected for speed but not for cheating
+               unsavedTaps += tapsToSend; 
            }
        } catch (err) {
            console.error("Save failed:", err.message);
            // Restore taps on error
            unsavedTaps += tapsToSend; 
+       } finally {
+           isSyncing = false;
        }
    }
 
