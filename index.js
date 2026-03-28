@@ -281,14 +281,14 @@ exports.claimReferral = functions.https.onCall(async (data, context) => {
     // Bonus for New User
     await userRef.update({
         referredBy: code,
-        score: admin.database.ServerValue.increment(2500)
+        score: admin.database.ServerValue.increment(5000)
     });
 
     // Bonus for Referrer
     await referrerRef.update({
-        score: admin.database.ServerValue.increment(2500),
+        score: admin.database.ServerValue.increment(5000),
         referralCount: admin.database.ServerValue.increment(1),
-        referralEarnings: admin.database.ServerValue.increment(2500)
+        referralEarnings: admin.database.ServerValue.increment(5000)
     });
 
     return { success: true, message: "Referral claimed successfully!" };

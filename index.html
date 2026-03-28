@@ -465,25 +465,22 @@
 
                        updateEnergyUI(energy);
 
-                       // --- CLIENT-SIDE REFERRAL LOGIC (Free plan) ---
-                       // Check if this is a new user and if they came from a referral link
-                       if (!data.referredBy) { // Only check if user has not been referred yet
+                       // --- SECURE SERVER-SIDE REFERRAL CHECK ---
+                       if (!data.referredBy) {
                            const urlParams = new URLSearchParams(window.location.search);
-                           const referralCode = urlParams.get('ref'); // We now use 'ref' for the code
-
-                           if (referralCode) {
-                                // Give bonus to referrer
-                                db.ref(`users/${referralCode}`).transaction(refData => {
-                                    if(refData) refData.score = (refData.score || 0) + 5000;
-                                    return refData;
-                                });
-                                // Give bonus to self
-                                userRef.update({
-                                    referredBy: referralCode,
-                                    score: (score || 0) + 2500
-                                });
-                                alert("Welcome! You received a 2,500 coin bonus for using a referral link!");
-                                window.history.replaceState({}, document.title, window.location.pathname);
+                           const referralCode = urlParams.get('ref');
+                           
+                           // Ensure we don't call it if the code is the same as the user
+                           if (referralCode && referralCode !== userId) {
+                               const claimReferral = firebase.functions().httpsCallable('claimReferral');
+                               claimReferral({ code: referralCode })
+                                   .then(result => {
+                                       if (result.data.success) {
+                                           alert("Welcome! You received a 5,000 coin bonus for joining via referral!");
+                                           window.history.replaceState({}, document.title, window.location.pathname);
+                                       }
+                                   })
+                                   .catch(err => console.error("Referral Error:", err.message));
                            }
                        }
                    } else {
@@ -603,6 +600,7 @@
 
            if (result.data.success) {
                console.log("Progress synced with server.");
+               // Optional: Re-sync local score with what server confirms if needed
            } else if (result.data.message) {
                alert(result.data.message);
            }
